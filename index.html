@@ -44,6 +44,13 @@
                 </div>
                 <div id="dynamic-island" class="collapsed">
                     <div class="island-content">···</div>
+                    <div class="island-call" id="island-call" aria-hidden="true">
+                        <div class="island-call-name" id="island-call-name">未知来电</div>
+                        <div class="island-call-actions">
+                            <button class="pixel-btn decline" data-call-action="decline">✕</button>
+                            <button class="pixel-btn accept" data-call-action="accept">✓</button>
+                        </div>
+                    </div>
                     <div class="unlock-ring"></div>
                     <div class="unlock-face">🙂</div>
                     <div class="unlock-check">✅</div>
@@ -68,6 +75,10 @@
                     <div class="app-icon" data-target="watch-page">
                         <div class="icon"></div>
                         <p>守望</p>
+                    </div>
+                    <div class="app-icon" data-target="memo-page">
+                        <div class="icon"></div>
+                        <p>备忘录</p>
                     </div>
                     <div class="app-icon" data-target="heart-page">
                         <div class="icon"></div>
@@ -118,6 +129,14 @@
                                 <div class="chat-actions-panel" id="chat-actions-panel">
                                     <button data-chataction="pay">转账</button>
                                     <button data-chataction="red">红包</button>
+                                    <div class="chat-action-form" id="chat-action-form">
+                                        <label id="chat-action-label"></label>
+                                        <input id="chat-action-amount" type="number" step="0.01" min="0" placeholder="输入金额" />
+                                        <div class="chat-action-form-buttons">
+                                            <button id="chat-action-confirm">确认</button>
+                                            <button id="chat-action-cancel" type="button">取消</button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -172,6 +191,20 @@
                     </div>
                 </div>
 
+                <!-- 备忘录页面 -->
+                <div id="memo-page" class="app-page" style="display:none;">
+                    <div class="page-header">
+                        <button class="back-home">‹</button>
+                        <span>备忘录</span>
+                    </div>
+                    <div class="app-scroll memo-body">
+                        <div class="memo-controls">
+                            <button id="memo-clear">清空</button>
+                        </div>
+                        <div class="memo-log" id="memo-log"></div>
+                    </div>
+                </div>
+
                 <!-- 心率页面 -->
                 <div id="heart-page" class="app-page" style="display:none;">
                     <div class="page-header">
@@ -199,8 +232,16 @@
                 <div class="red-envelope-card">
                     <div class="red-envelope-title">红包</div>
                     <div class="red-envelope-amount" id="red-envelope-amount">¥0.00</div>
-                    <div class="red-envelope-note">点击领取后将发送给对方</div>
+                    <div class="red-envelope-note">点击领取即可拆开红包</div>
                     <button id="red-envelope-confirm">领取</button>
+                </div>
+            </div>
+            <div id="in-call-overlay" aria-hidden="true">
+                <div class="in-call-card">
+                    <div class="in-call-name" id="in-call-name">元书</div>
+                    <div class="in-call-status" id="in-call-status">来电中…</div>
+                    <div class="in-call-timer" id="in-call-timer">00:00</div>
+                    <button id="in-call-end">挂断</button>
                 </div>
             </div>
             <div id="home-bar"></div>

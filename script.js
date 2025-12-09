@@ -50,9 +50,182 @@ function triggerIslandNotify(msg) {
     }, 1500);
 }
 
+const memoState = {
+    max: 50,
+    items: [],
+    listEl: null,
+};
+
+function formatMemoTime(date) {
+    const d = date instanceof Date ? date : new Date(date);
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    return `${hh}:${mm}`;
+}
+
+function renderMemoLog() {
+    if (!memoState.listEl) return;
+    memoState.listEl.innerHTML = "";
+    memoState.items.forEach(item => {
+        const row = document.createElement("div");
+        row.className = "memo-item";
+        const span = document.createElement("span");
+        span.textContent = formatMemoTime(item.time);
+        const text = document.createElement("div");
+        text.textContent = item.text;
+        row.appendChild(span);
+        row.appendChild(text);
+        memoState.listEl.appendChild(row);
+    });
+}
+
+function addMemoEntry(text) {
+    if (!text) return;
+    memoState.items.unshift({ text, time: new Date() });
+    if (memoState.items.length > memoState.max) {
+        memoState.items.pop();
+    }
+    renderMemoLog();
+}
+
+function clearMemoEntries() {
+    memoState.items = [];
+    renderMemoLog();
+}
+
+const callOverlayState = {
+    container: null,
+    nameEl: null,
+    statusEl: null,
+    timerEl: null,
+    endBtn: null,
+    timerId: null,
+    startTime: 0,
+    activeName: "",
+    direction: "",
+    previousLabel: "",
+};
+
+let islandCallState = null;
+let callRetryTimeout = null;
+
+function ensureCallOverlayElements() {
+    if (!callOverlayState.container) {
+        callOverlayState.container = document.getElementById("in-call-overlay");
+        callOverlayState.nameEl = document.getElementById("in-call-name");
+        callOverlayState.statusEl = document.getElementById("in-call-status");
+        callOverlayState.timerEl = document.getElementById("in-call-timer");
+        callOverlayState.endBtn = document.getElementById("in-call-end");
+        if (callOverlayState.endBtn) {
+            callOverlayState.endBtn.addEventListener("click", () => {
+                endCallSession("挂断");
+            });
+        }
+    }
+}
+
+function updateCallTimerDisplay() {
+    if (!callOverlayState.timerEl || !callOverlayState.startTime) return;
+    const elapsed = Math.floor((Date.now() - callOverlayState.startTime) / 1000);
+    const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
+    const ss = String(elapsed % 60).padStart(2, "0");
+    callOverlayState.timerEl.textContent = `${mm}:${ss}`;
+}
+
+function startCallSession(name, direction = "incoming") {
+    ensureCallOverlayElements();
+    hideIslandCallAlert();
+    if (!callOverlayState.container) return;
+    callOverlayState.previousLabel = dynamicIslandLabel;
+    callOverlayState.activeName = name;
+    callOverlayState.direction = direction;
+    if (callOverlayState.nameEl) callOverlayState.nameEl.textContent = name;
+    if (callOverlayState.statusEl) {
+        callOverlayState.statusEl.textContent = direction === "incoming" ? "来电 · 通话中" : "呼出 · 通话中";
+    }
+    callOverlayState.container.classList.add("show");
+    callOverlayState.startTime = Date.now();
+    updateCallTimerDisplay();
+    if (callOverlayState.timerId) clearInterval(callOverlayState.timerId);
+    callOverlayState.timerId = setInterval(updateCallTimerDisplay, 1000);
+    setIslandLabel(`${name} · 通话中`);
+}
+
+function endCallSession(reason = "结束通话") {
+    ensureCallOverlayElements();
+    if (!callOverlayState.container) return;
+    callOverlayState.container.classList.remove("show");
+    if (callOverlayState.timerId) {
+        clearInterval(callOverlayState.timerId);
+        callOverlayState.timerId = null;
+    }
+    callOverlayState.startTime = 0;
+    if (callOverlayState.activeName) {
+        addMemoEntry(`${reason} · ${callOverlayState.activeName}`);
+    }
+    callOverlayState.activeName = "";
+    callOverlayState.direction = "";
+    const restore = callOverlayState.previousLabel || "Wechat";
+    callOverlayState.previousLabel = "";
+    setIslandLabel(restore);
+}
+
+function showIslandCallAlert(name, { retry = true } = {}) {
+    ensureIslandElements();
+    const callEl = document.getElementById("island-call");
+    const nameEl = document.getElementById("island-call-name");
+    if (nameEl) nameEl.textContent = name;
+    if (dynamicIsland) dynamicIsland.classList.add("call-alert");
+    if (callEl) callEl.setAttribute("aria-hidden", "false");
+    islandCallState = { name, retry };
+    setIslandLabel(name);
+}
+
+function hideIslandCallAlert() {
+    ensureIslandElements();
+    const callEl = document.getElementById("island-call");
+    if (dynamicIsland) dynamicIsland.classList.remove("call-alert");
+    if (callEl) callEl.setAttribute("aria-hidden", "true");
+    islandCallState = null;
+    if (callRetryTimeout) {
+        clearTimeout(callRetryTimeout);
+        callRetryTimeout = null;
+    }
+}
+
+function handleIslandCallAction(action) {
+    if (!islandCallState) return;
+    const name = islandCallState.name;
+    if (action === "accept") {
+        addMemoEntry(`接听来电 ← ${name}`);
+        startCallSession(name, "incoming");
+        islandCallState = null;
+    } else if (action === "decline") {
+        addMemoEntry(`拒绝来电 ← ${name}`);
+        const shouldRetry = islandCallState.retry;
+        islandCallState = null;
+        hideIslandCallAlert();
+        if (shouldRetry) {
+            scheduleCallRetry(name);
+        }
+    }
+}
+
+function scheduleCallRetry(name, delay = 3000) {
+    if (callRetryTimeout) clearTimeout(callRetryTimeout);
+    callRetryTimeout = setTimeout(() => {
+        triggerIncomingCall(name, false);
+    }, delay);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const body = document.body;
     const appIcons = document.querySelectorAll('.app-icon');
+    const memoLogEl = document.getElementById('memo-log');
+    const memoClearBtn = document.getElementById('memo-clear');
+    memoState.listEl = memoLogEl;
+    renderMemoLog();
+    if (memoClearBtn) memoClearBtn.addEventListener('click', clearMemoEntries);
 
     /* --------- 剧情系统：只是本地假对话，之后再换 AI --------- */
     const storyLog = document.getElementById('story-log');
@@ -136,6 +309,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const appPages = document.querySelectorAll('.app-page');
     const backButtons = document.querySelectorAll('.back-home');
 
+    const APP_LABELS = {
+        "wechat-page": "微信",
+        "call-page": "电话",
+        "darkfog-page": "黑雾",
+        "watch-page": "守望",
+        "memo-page": "备忘录",
+        "heart-page": "心率",
+        "settings-page": "设置",
+    };
+
+    function recordAppOpen(id) {
+        const name = APP_LABELS[id];
+        if (name) addMemoEntry(`打开 ${name}`);
+    }
+
     function showHome() {
         appPages.forEach(p => p.style.display = 'none');
         homeScreen.style.display = 'grid';
@@ -153,6 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 恢复默认滚动顶和顶部状态
         const scroll = document.querySelector(`#${id} .app-scroll`);
         if (scroll) scroll.scrollTop = 0;
+        recordAppOpen(id);
     }
 
     appIcons.forEach(icon => {
@@ -469,19 +658,31 @@ function setupWeChat() {
     const chatActionsToggle = document.getElementById("chat-actions-toggle");
     const chatActionsPanel = document.getElementById("chat-actions-panel");
     const chatActionButtons = document.querySelectorAll("[data-chataction]");
+    const chatActionForm = document.getElementById("chat-action-form");
+    const chatActionLabel = document.getElementById("chat-action-label");
+    const chatActionAmount = document.getElementById("chat-action-amount");
+    const chatActionConfirm = document.getElementById("chat-action-confirm");
+    const chatActionCancel = document.getElementById("chat-action-cancel");
     const walletAmtEl = document.getElementById("wallet-balance-amt");
     const redEnvelopeOverlay = document.getElementById("red-envelope-overlay");
     const redEnvelopeAmount = document.getElementById("red-envelope-amount");
     const redEnvelopeConfirm = document.getElementById("red-envelope-confirm");
     let walletBalance = 2180.0;
-    let pendingRedAmount = null;
+    let pendingRedEnvelope = null;
     let chatActionsOpen = false;
+    let currentChatAction = null;
+    const ACTION_PRESETS = {
+        pay: { type: "pay", label: "转账金额（≤1,000,000）", min: 0.01, max: 1000000, defaultValue: 520.00 },
+        red: { type: "red", label: "红包金额（0-200）", min: 0, max: 200, defaultValue: 66.00 },
+    };
 
     const chats = [
         { id: "yuan", name: "元书", preview: "“靠近一点。”", icon: "◻", time: "刚刚", unread: 1, log: [
+            { from:"in", text:"零钱到账 ¥1314.00", kind:"pay", amount: 1314.00 },
             { from:"in", text:"“你今天在门口回头三次。”" },
             { from:"out", text:"我只是觉得有人跟着我。" },
             { from:"in", text:"“那就是我。”" },
+            { from:"in", text:"红包 ¥6.00", kind:"red", amount: 6.00, redeemed: false },
         ]},
         { id: "room", name: "室友", preview: "电闸修好了。", icon: "▣", time: "下午", unread: 0, log: [
             { from:"in", text:"电闸修好了，你晚点回来吗？" },
@@ -499,6 +700,18 @@ function setupWeChat() {
         { who: "未知信号", text: "今晚的城很安静，像在等一场失控。", time: "1 小时前", likes: 9, likedByUser: false },
         { who: "甜品店老板", text: "提前留了三盒奶油泡芙，希望他别发火。", time: "2 小时前", likes: 12, likedByUser: false },
     ];
+
+    function formatChatText(message) {
+        if (!message) return "";
+        if (message.text) return message.text;
+        if (message.kind === "pay" && message.amount != null) {
+            return `转账 ¥${message.amount.toFixed(2)}`;
+        }
+        if (message.kind === "red" && message.amount != null) {
+            return message.redeemed ? `已收红包 ¥${message.amount.toFixed(2)}` : `红包 ¥${message.amount.toFixed(2)}`;
+        }
+        return "";
+    }
 
     function updateWalletDisplay() {
         if (walletAmtEl) walletAmtEl.textContent = `¥ ${walletBalance.toFixed(2)}`;
@@ -539,7 +752,10 @@ function setupWeChat() {
         });
         const top = document.getElementById("wechat-top");
         const totalUnread = totalUnreadCount();
-        if (top) top.textContent = `Wechat (${totalUnread})`;
+        if (top) {
+            const chatOpen = chatWindow && chatWindow.style.display !== "none";
+            if (!chatOpen) top.textContent = `Wechat (${totalUnread})`;
+        }
         const chatBadge = document.getElementById("chat-unread-total");
         if (chatBadge) {
             if (totalUnread > 0) {
@@ -603,6 +819,8 @@ function setupWeChat() {
         });
         if (chatWindow) chatWindow.style.display = "none";
         if (wechatBottom) wechatBottom.style.display = "grid";
+        setChatActions(false);
+        hideRedEnvelopeOverlay();
         const unread = totalUnreadCount();
         if (wechatTop) {
             if (target === "chats") wechatTop.textContent = `Wechat (${unread})`;
@@ -627,13 +845,12 @@ function setupWeChat() {
         });
         setChatActions(false);
         hideRedEnvelopeOverlay();
-        pendingRedAmount = null;
         chatLog.innerHTML = "";
         c.log.forEach(m => {
             const b = document.createElement("div");
             const kind = m.kind ? ` ${m.kind}` : "";
             b.className = "chat-bubble " + (m.from === "in" ? "in" : "out") + kind;
-            b.textContent = m.text;
+            b.textContent = formatChatText(m);
             const row = document.createElement("div");
             row.className = "chat-row " + (m.from === "in" ? "in" : "out");
             const avatar = document.createElement("div");
@@ -641,6 +858,13 @@ function setupWeChat() {
             avatar.textContent = m.from === "in" ? "◻" : "▣";
             row.appendChild(avatar);
             row.appendChild(b);
+            if (m.kind === "red" && m.from === "in") {
+                b.classList.add("red-bubble-in");
+                if (!m.redeemed) {
+                    b.classList.add("red-can-open");
+                    b.addEventListener("click", () => showRedEnvelopeOverlay(m, id));
+                }
+            }
             chatLog.appendChild(row);
         });
         chatLog.scrollTop = chatLog.scrollHeight;
@@ -648,7 +872,7 @@ function setupWeChat() {
         chatWindow.style.display = "flex";
         if (wechatBottom) wechatBottom.style.display = "none";
         if (wechatTop && chatTitle) {
-            wechatTop.textContent = `Wechat (${totalUnreadCount()})`;
+            wechatTop.textContent = c.name;
             chatTitle.textContent = c.name;
         }
         setIslandLabel(c.name);
@@ -666,20 +890,45 @@ function setupWeChat() {
         chatActionsOpen = shouldOpen;
         chatActionsPanel.classList.toggle("open", chatActionsOpen);
         chatActionsToggle.classList.toggle("active", chatActionsOpen);
+        if (!chatActionsOpen) closeChatActionForm();
     }
 
-    function showRedEnvelopeOverlay(amount) {
-        if (!redEnvelopeOverlay) return;
+    function openChatActionForm(type) {
+        if (!chatActionForm || !chatActionLabel || !chatActionAmount) return;
+        const preset = ACTION_PRESETS[type];
+        if (!preset) return;
+        currentChatAction = { ...preset };
+        chatActionLabel.textContent = preset.label;
+        chatActionAmount.value = preset.defaultValue.toFixed(2);
+        chatActionAmount.min = preset.min;
+        chatActionAmount.max = preset.max;
+        chatActionForm.classList.add("show");
+        chatActionAmount.focus();
+        setChatActions(true);
+    }
+
+    function closeChatActionForm() {
+        if (chatActionForm) chatActionForm.classList.remove("show");
+        currentChatAction = null;
+    }
+
+    function showRedEnvelopeOverlay(message, chatId) {
+        if (!redEnvelopeOverlay || !message) return;
+        pendingRedEnvelope = { message, chatId };
         setChatActions(false);
-        if (redEnvelopeAmount) redEnvelopeAmount.textContent = `¥${amount.toFixed(2)}`;
+        if (redEnvelopeAmount) {
+            const amt = message.amount != null ? message.amount : 0;
+            redEnvelopeAmount.textContent = `¥${amt.toFixed(2)}`;
+        }
         redEnvelopeOverlay.classList.add("show");
     }
 
     function hideRedEnvelopeOverlay() {
         if (redEnvelopeOverlay) redEnvelopeOverlay.classList.remove("show");
+        pendingRedEnvelope = null;
     }
 
-    function sendChat(textOverride, kindOverride) {
+    function sendChat(textOverride, kindOverride, meta = {}) {
         if (!chatWindow || !chatInput) return;
         const id = chatWindow.dataset.chat;
         const c = chats.find(x => x.id === id);
@@ -687,7 +936,14 @@ function setupWeChat() {
         const text = (textOverride != null ? textOverride : chatInput.value.trim());
         if (!text) return;
         const kind = kindOverride || "";
-        c.log.push({ from:"out", text, kind });
+        const msg = {
+            from: "out",
+            text,
+            kind,
+        };
+        if (meta.amount != null) msg.amount = meta.amount;
+        if (meta.redeemed) msg.redeemed = true;
+        c.log.push(msg);
         c.preview = text;
         c.time = "刚刚";
         chatInput.value = "";
@@ -723,30 +979,61 @@ function setupWeChat() {
     }
     chatActionButtons.forEach(btn => {
         btn.addEventListener("click", () => {
-            const type = btn.dataset.chataction;
-            if (type === "pay") {
-                sendChat("转账 ¥520.00", "pay");
-                adjustWallet(-520);
-            } else if (type === "red") {
-                pendingRedAmount = 188;
-                showRedEnvelopeOverlay(pendingRedAmount);
-            }
+            openChatActionForm(btn.dataset.chataction);
         });
     });
+    if (chatActionConfirm && chatActionAmount) {
+        chatActionConfirm.addEventListener("click", () => {
+            if (!currentChatAction) return;
+            const amount = parseFloat(chatActionAmount.value);
+            if (Number.isNaN(amount)) {
+                alert("请输入有效的金额");
+                return;
+            }
+            if (amount < currentChatAction.min || amount > currentChatAction.max) {
+                alert(`金额需在 ${currentChatAction.min} - ${currentChatAction.max} 之间`);
+                return;
+            }
+            const formatted = amount.toFixed(2);
+            if (currentChatAction.type === "pay") {
+                sendChat(`转账 ¥${formatted}`, "pay", { amount });
+                adjustWallet(-amount);
+                addMemoEntry(`转账 → ¥${formatted}`);
+            } else if (currentChatAction.type === "red") {
+                sendChat(`红包 ¥${formatted}`, "red", { amount, redeemed: true });
+                adjustWallet(-amount);
+            }
+            closeChatActionForm();
+            setChatActions(false);
+        });
+    }
+    if (chatActionCancel) {
+        chatActionCancel.addEventListener("click", () => {
+            closeChatActionForm();
+        });
+    }
     if (redEnvelopeConfirm) {
         redEnvelopeConfirm.addEventListener("click", () => {
-            if (pendingRedAmount != null) {
-                sendChat(`红包 ¥${pendingRedAmount.toFixed(2)}`, "red");
-                adjustWallet(-pendingRedAmount);
+            if (pendingRedEnvelope && pendingRedEnvelope.message) {
+                const msg = pendingRedEnvelope.message;
+                msg.redeemed = true;
+                if (msg.amount != null) {
+                    msg.text = `已收红包 ¥${msg.amount.toFixed(2)}`;
+                    adjustWallet(msg.amount);
+                }
+                const activeId = chatWindow ? chatWindow.dataset.chat : null;
+                if (activeId && pendingRedEnvelope.chatId === activeId) {
+                    openChat(activeId);
+                } else {
+                    renderChats();
+                }
             }
-            pendingRedAmount = null;
             hideRedEnvelopeOverlay();
         });
     }
     if (redEnvelopeOverlay) {
         redEnvelopeOverlay.addEventListener("click", (e) => {
             if (e.target === redEnvelopeOverlay) {
-                pendingRedAmount = null;
                 hideRedEnvelopeOverlay();
             }
         });
@@ -755,8 +1042,9 @@ function setupWeChat() {
         if (chatWindow) chatWindow.style.display = "none";
         switchTab("chats");
         setIslandLabel("Wechat");
-        pendingRedAmount = null;
         hideRedEnvelopeOverlay();
+        const top = document.getElementById("wechat-top");
+        if (top) top.textContent = `Wechat (${totalUnreadCount()})`;
     });
 
     /* 电话页：记录/联系人/拨号 */
@@ -824,6 +1112,9 @@ function setupWeChat() {
                 callHistory.unshift({ name: num, time: "刚刚", note: "去电" });
                 renderCallHistory();
                 dialDisplay.textContent = "输入号码…";
+                addMemoEntry(`呼出 → 元书`);
+                triggerIslandNotify("呼出：元书");
+                startCallSession("元书", "outgoing");
             });
         }
     }
@@ -839,12 +1130,13 @@ function setupWeChat() {
     renderDial();
     switchCallTab("history");
 
-    function triggerIncomingCall(name = "未知来电", openUI = true) {
+    function triggerIncomingCall(name = "未知来电", retry = true) {
         callHistory.unshift({ name, time: "刚刚", note: "来电" });
         renderCallHistory();
         switchCallTab("history");
         triggerIslandNotify(`来电：${name}`);
-        if (openUI) openPage("call-page");
+        addMemoEntry(`来电 ← ${name}`);
+        showIslandCallAlert(name, { retry });
     }
 
     renderChats();
@@ -853,13 +1145,6 @@ function setupWeChat() {
     switchTab("chats");
     setIslandLabel("Wechat");
 
-    // 预置钱包消息到元书聊天
-    const yuan = chats.find(x => x.id === "yuan");
-    if (yuan) {
-        yuan.log.unshift({ from:"in", text:"零钱到账 ¥1314.00", kind:"pay" });
-        yuan.preview = "零钱到账 ¥1314.00";
-        yuan.unread = (yuan.unread || 0) + 1;
-    }
     updateWalletDisplay();
 
     // 黑雾点击：注入消息+转账，触发岛通知
@@ -867,11 +1152,12 @@ function setupWeChat() {
         icon.addEventListener('click', () => {
             const targetChat = chats.find(x => x.id === "yuan");
             if (targetChat) {
-                targetChat.log.push({ from:"in", text:"黑雾覆盖：他在看你。", kind:"red" });
-                targetChat.log.push({ from:"in", text:"转账 ¥66.00", kind:"pay" });
+                targetChat.log.push({ from:"in", text:"黑雾覆盖：他在看你。" });
+                targetChat.log.push({ from:"in", text:"红包 ¥18.00", kind:"red", amount: 18.00, redeemed: false });
+                targetChat.log.push({ from:"in", text:"转账 ¥66.00", kind:"pay", amount: 66.00 });
                 targetChat.preview = "转账 ¥66.00";
                 targetChat.time = "刚刚";
-                targetChat.unread = (targetChat.unread || 0) + 2;
+                targetChat.unread = (targetChat.unread || 0) + 3;
                 walletBalance += 66;
                 updateWalletDisplay();
                 renderChats();
@@ -883,7 +1169,7 @@ function setupWeChat() {
     // 守望：触发来电
     document.querySelectorAll('.app-icon[data-target="watch-page"]').forEach(icon => {
         icon.addEventListener('click', () => {
-            triggerIncomingCall("守望 · 来电", false);
+            triggerIncomingCall("守望 · 来电");
         });
     });
 }

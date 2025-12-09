@@ -814,6 +814,9 @@ body.mobile-mode #app {
     cursor: pointer;
 }
 .page-header span { display: none; }
+.app-page .page-header span {
+    display: inline;
+}
 .app-scroll {
     flex: 1;
     min-height: 0;
@@ -873,7 +876,7 @@ body.mobile-mode #app {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 6px;
-    padding: 5px 6px 9px;
+    padding: 5px 0 9px;
 }
 .wechat-tabs button {
     border-radius: 10px;
@@ -905,6 +908,7 @@ body.mobile-mode #app {
     gap: 8px;
     max-height: 100%;
     overflow: hidden;
+    width: 100%;
 }
 .wechat-moments-wrap {
     padding: 0;
@@ -1252,6 +1256,10 @@ body.mobile-mode #app {
 .chat-bubble.out { align-self: flex-end; background: #6ad35f; color: #0b2b08; border: 1px solid rgba(0,0,0,0.08); margin-left: auto; }
 .chat-bubble.pay { background: rgba(120,200,140,0.25); border-color: rgba(120,200,140,0.65); }
 .chat-bubble.red { background: rgba(240,120,120,0.22); border-color: rgba(240,120,120,0.6); }
+.chat-bubble.red-can-open {
+    cursor: pointer;
+    box-shadow: 0 0 12px rgba(240,120,120,0.4);
+}
 .chat-window-input {
     display: flex;
     gap: 8px;
@@ -1308,7 +1316,7 @@ body.mobile-mode #app {
 }
 .chat-actions-panel.open {
     padding: 8px 10px 12px;
-    max-height: 120px;
+    max-height: 220px;
 }
 .chat-actions-panel button {
     flex: 1;
@@ -1319,6 +1327,34 @@ body.mobile-mode #app {
     font-size: 12px;
     padding: 8px 10px;
     cursor: pointer;
+}
+.chat-action-form {
+    flex-basis: 100%;
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+}
+.chat-action-form.show {
+    display: flex;
+}
+.chat-action-form label {
+    font-size: 12px;
+    color: rgba(255,255,255,0.75);
+}
+.chat-action-form input {
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(0,0,0,0.4);
+    color: #fff;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+.chat-action-form-buttons {
+    display: flex;
+    gap: 8px;
+}
+.chat-action-form-buttons button {
+    flex: 1;
 }
 
 /* 悬浮手机按钮：像素小手机图标 */
@@ -1432,6 +1468,147 @@ body.mobile-mode #app {
     font-weight: 700;
     padding: 8px 0;
     cursor: pointer;
+}
+
+#in-call-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(5,5,8,0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+    z-index: 210;
+}
+#in-call-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+.in-call-card {
+    width: 80%;
+    max-width: 260px;
+    border-radius: 26px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: linear-gradient(160deg, #150910, #07060a);
+    padding: 20px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+}
+.in-call-name {
+    font-size: 18px;
+    font-weight: 800;
+}
+.in-call-status {
+    font-size: 12px;
+    color: rgba(255,255,255,0.75);
+}
+.in-call-timer {
+    font-size: 24px;
+    letter-spacing: 0.08em;
+}
+#in-call-end {
+    width: 100%;
+    border-radius: 999px;
+    border: none;
+    padding: 10px 0;
+    font-size: 14px;
+    font-weight: 700;
+    background: #f45252;
+    color: #fff;
+    cursor: pointer;
+}
+
+.memo-body {
+    padding: 10px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.memo-controls {
+    display: flex;
+    justify-content: flex-end;
+}
+.memo-controls button {
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(0,0,0,0.4);
+    color: #fff;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.memo-log {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.memo-item {
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.04);
+    font-size: 12px;
+    color: rgba(255,255,255,0.85);
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+.memo-item span {
+    font-weight: 600;
+    color: rgba(255,255,255,0.9);
+}
+
+#dynamic-island.call-alert {
+    width: 220px;
+    height: 80px;
+    border-radius: 26px;
+}
+#dynamic-island.call-alert .island-content {
+    display: none;
+}
+.island-call {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+#dynamic-island.call-alert .island-call {
+    display: flex;
+}
+.island-call-name {
+    font-size: 13px;
+    font-weight: 700;
+}
+.island-call-actions {
+    display: flex;
+    gap: 12px;
+}
+.pixel-btn {
+    width: 32px;
+    height: 32px;
+    border: 2px solid rgba(255,255,255,0.6);
+    border-radius: 6px;
+    background: rgba(0,0,0,0.8);
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: inset 0 0 0 2px rgba(0,0,0,0.6);
+}
+.pixel-btn.accept {
+    border-color: #88f598;
+    color: #88f598;
+}
+.pixel-btn.decline {
+    border-color: #ff8383;
+    color: #ff8383;
 }
 
 body.pc-mode.phone-open #phone-layer {
