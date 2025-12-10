@@ -1,7 +1,9 @@
+const DEFAULT_ISLAND_LABEL = "···";
 let dynamicIsland = null;
 let dynamicIslandContent = null;
-let dynamicIslandLabel = "···";
+let dynamicIslandLabel = DEFAULT_ISLAND_LABEL;
 let islandClickBound = false;
+let phoneAlertHandler = null;
 
 function ensureIslandElements() {
     if (!dynamicIsland) {
@@ -21,7 +23,19 @@ function ensureIslandElements() {
 
 function setIslandLabel(text) {
     ensureIslandElements();
-    dynamicIslandLabel = text || "···";
+    phoneAlertHandler = (text = "新消息") => {
+        if (!toggleBtn || phoneVisible) return;
+        toggleBtn.classList.add('notify');
+        if (phoneToggleBubble) {
+            phoneToggleBubble.textContent = text;
+            phoneToggleBubble.classList.add('show');
+        }
+        if (phoneAlertTimer) clearTimeout(phoneAlertTimer);
+        phoneAlertTimer = setTimeout(() => {
+            clearPhoneAlert();
+        }, 2600);
+    };
+    dynamicIslandLabel = text || DEFAULT_ISLAND_LABEL;
     if (dynamicIsland && dynamicIslandContent && !dynamicIsland.classList.contains("notify")) {
         dynamicIslandContent.textContent = dynamicIslandLabel;
     }
@@ -165,9 +179,8 @@ function endCallSession(reason = "结束通话") {
     }
     callOverlayState.activeName = "";
     callOverlayState.direction = "";
-    const restore = callOverlayState.previousLabel || "Wechat";
     callOverlayState.previousLabel = "";
-    setIslandLabel(restore);
+    setIslandLabel(DEFAULT_ISLAND_LABEL);
 }
 
 function showIslandCallAlert(name, { retry = true } = {}) {
@@ -179,6 +192,7 @@ function showIslandCallAlert(name, { retry = true } = {}) {
     if (callEl) callEl.setAttribute("aria-hidden", "false");
     islandCallState = { name, retry };
     setIslandLabel(name);
+    if (phoneAlertHandler) phoneAlertHandler("来电");
 }
 
 function hideIslandCallAlert() {
@@ -349,6 +363,8 @@ document.addEventListener('DOMContentLoaded', () => {
         recordAppOpen(id);
     }
 
+    window.__openPhonePage = openPage;
+
     appIcons.forEach(icon => {
         icon.addEventListener('click', () => {
             const target = icon.getAttribute('data-target');
@@ -399,6 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /* --------- 悬浮按钮：拖拽 + 吸附 + 打开手机 ---------- */
     const phoneLayer = document.getElementById('phone-layer');
     const toggleBtn = document.getElementById('phone-toggle');
+    const phoneToggleBubble = document.getElementById('phone-toggle-bubble');
 
     let phoneVisible = false;
     let dragging = false;
@@ -413,6 +430,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return body.classList.contains('mobile-mode');
     }
 
+    let phoneAlertTimer = null;
+
+    function clearPhoneAlert() {
+        if (!toggleBtn) return;
+        toggleBtn.classList.remove('notify');
+        if (phoneToggleBubble) phoneToggleBubble.classList.remove('show');
+        if (phoneAlertTimer) {
+            clearTimeout(phoneAlertTimer);
+            phoneAlertTimer = null;
+        }
+    }
+
     function setPhoneVisible(show) {
         phoneVisible = show;
         if (isMobileMode()) {
@@ -420,13 +449,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 phoneLayer.classList.add('show');
                 body.classList.add('phone-open');
                 triggerIslandUnlock();
+                clearPhoneAlert();
             } else {
                 phoneLayer.classList.remove('show');
                 body.classList.remove('phone-open');
             }
         } else {
             body.classList.toggle('phone-open', show);
-            if (show) triggerIslandUnlock();
+            if (show) {
+                triggerIslandUnlock();
+                clearPhoneAlert();
+            }
         }
     }
 
@@ -662,10 +695,11 @@ function setupWeChat() {
     const momentsFeed = document.getElementById("wechat-moments-feed");
     const chatActionsToggle = document.getElementById("chat-actions-toggle");
     const chatActionsPanel = document.getElementById("chat-actions-panel");
+    const chatActionsButtons = document.getElementById("chat-actions-buttons");
     const chatActionButtons = document.querySelectorAll("[data-chataction]");
     const chatActionForm = document.getElementById("chat-action-form");
-    const chatActionLabel = document.getElementById("chat-action-label");
-    const chatActionAmount = document.getElementById("chat-action-amount");
+    const chatActionDisplay = document.getElementById("chat-action-display");
+    const chatActionKeypad = document.getElementById("chat-action-keypad");
     const chatActionConfirm = document.getElementById("chat-action-confirm");
     const chatActionCancel = document.getElementById("chat-action-cancel");
     const walletAmtEl = document.getElementById("wallet-balance-amt");
@@ -679,6 +713,7 @@ function setupWeChat() {
     let pendingRedEnvelope = null;
     let chatActionsOpen = false;
     let currentChatAction = null;
+    let chatActionValue = "";
     const ACTION_PRESETS = {
         pay: { type: "pay", label: "转账金额（≤1,000,000）", min: 0.01, max: 1000000, defaultValue: 520.00 },
         red: { type: "red", label: "红包金额（0-200）", min: 0, max: 200, defaultValue: 66.00 },
@@ -706,10 +741,25 @@ function setupWeChat() {
     ];
 
     const moments = [
-        { who: "你", text: "今天只是想确认一件事：你有没有在看我。", time: "刚刚", likes: 23, likedByUser: false },
-        { who: "未知信号", text: "今晚的城很安静，像在等一场失控。", time: "1 小时前", likes: 9, likedByUser: false },
-        { who: "甜品店老板", text: "提前留了三盒奶油泡芙，希望他别发火。", time: "2 小时前", likes: 12, likedByUser: false },
+        { who: "你", text: "今天只是想确认一件事：你有没有在看我。", time: "刚刚", likes: 23, likedByUser: false, comments: [] },
+        { who: "未知信号", text: "今晚的城很安静，像在等一场失控。", time: "1 小时前", likes: 9, likedByUser: false, comments: [] },
+        { who: "甜品店老板", text: "提前留了三盒奶油泡芙，希望他别发火。", time: "2 小时前", likes: 12, likedByUser: false, comments: [] },
     ];
+    const momentTemplates = {
+        comment: ["看见你了。", "留意安全。", "别太累。"],
+        mention: ["@你 在吗？", "@你 别怕，我在。", "@你 记得回信。"]
+    };
+
+    function addMomentComment(moment, text, type = "comment") {
+        if (!moment || !text) return;
+        moment.comments = moment.comments || [];
+        moment.comments.push({ text, type, time: new Date() });
+        addMemoEntry(`朋友圈评论 · ${text}`);
+        if (type === "mention" && phoneAlertHandler) {
+            phoneAlertHandler("@ 提醒");
+        }
+        renderMoments();
+    }
 
     function formatChatText(message) {
         if (!message) return "";
@@ -753,11 +803,16 @@ function setupWeChat() {
         if (!chat || !msg) return;
         const preview = formatChatText(msg) || msg.text || "";
         showMessageBanner(chat.name, preview, chat.id);
+        if (phoneAlertHandler) phoneAlertHandler(preview.includes("@") ? "@ 提醒" : "新消息");
     }
 
     if (messageBanner) {
         messageBanner.addEventListener("click", () => {
             if (messageBannerTarget) {
+                if (typeof window.__openPhonePage === "function") {
+                    window.__openPhonePage("wechat-page");
+                }
+                switchTab("chats");
                 openChat(messageBannerTarget);
             }
             hideMessageBanner();
@@ -830,7 +885,8 @@ function setupWeChat() {
                 </div>
                 <div class="moment-actions">
                     <button class="like" data-act="like">${m.likedByUser ? "取消赞" : "赞一下"}</button>
-                    <button>评论</button>
+                    <button data-act="comment">评论</button>
+                    <button data-act="mention">@TA</button>
                 </div>
             `;
             div.querySelector('[data-act="like"]').addEventListener("click", () => {
@@ -838,6 +894,57 @@ function setupWeChat() {
                 m.likes = Math.max(0, m.likes + (m.likedByUser ? 1 : -1));
                 renderMoments();
             });
+            const templatePanel = document.createElement("div");
+            templatePanel.className = "moment-template-panel";
+            const commentLabel = document.createElement("div");
+            commentLabel.className = "section-label";
+            commentLabel.textContent = "评论模版";
+            const commentWrap = document.createElement("div");
+            commentWrap.className = "template-chips";
+            momentTemplates.comment.forEach(text => {
+                const btn = document.createElement("button");
+                btn.textContent = text;
+                btn.addEventListener("click", () => {
+                    addMomentComment(m, text, "comment");
+                });
+                commentWrap.appendChild(btn);
+            });
+            const mentionLabel = document.createElement("div");
+            mentionLabel.className = "section-label";
+            mentionLabel.textContent = "@ 模版";
+            const mentionWrap = document.createElement("div");
+            mentionWrap.className = "template-chips";
+            momentTemplates.mention.forEach(text => {
+                const btn = document.createElement("button");
+                btn.textContent = text;
+                btn.addEventListener("click", () => {
+                    addMomentComment(m, text, "mention");
+                });
+                mentionWrap.appendChild(btn);
+            });
+            templatePanel.appendChild(commentLabel);
+            templatePanel.appendChild(commentWrap);
+            templatePanel.appendChild(mentionLabel);
+            templatePanel.appendChild(mentionWrap);
+            div.appendChild(templatePanel);
+            const commentBtn = div.querySelector('[data-act="comment"]');
+            const mentionBtn = div.querySelector('[data-act="mention"]');
+            const togglePanel = () => {
+                templatePanel.classList.toggle("show");
+            };
+            if (commentBtn) commentBtn.addEventListener("click", togglePanel);
+            if (mentionBtn) mentionBtn.addEventListener("click", togglePanel);
+            if (m.comments && m.comments.length) {
+                const commentsBlock = document.createElement("div");
+                commentsBlock.className = "moment-comments";
+                m.comments.forEach(c => {
+                    const item = document.createElement("div");
+                    item.className = "moment-comment";
+                    item.innerHTML = `<span>${c.type === "mention" ? "@你" : "你"}</span>${c.text}`;
+                    commentsBlock.appendChild(item);
+                });
+                div.appendChild(commentsBlock);
+            }
             wrap.appendChild(div);
         });
     }
@@ -944,22 +1051,60 @@ function setupWeChat() {
     }
 
     function openChatActionForm(type) {
-        if (!chatActionForm || !chatActionLabel || !chatActionAmount) return;
+        if (!chatActionForm || !chatActionsButtons) return;
         const preset = ACTION_PRESETS[type];
         if (!preset) return;
         currentChatAction = { ...preset };
-        chatActionLabel.textContent = preset.label;
-        chatActionAmount.value = preset.defaultValue.toFixed(2);
-        chatActionAmount.min = preset.min;
-        chatActionAmount.max = preset.max;
+        chatActionValue = preset.defaultValue.toFixed(2);
+        chatActionsButtons.style.display = "none";
         chatActionForm.classList.add("show");
-        chatActionAmount.focus();
+        updateChatActionDisplay();
         setChatActions(true);
     }
 
     function closeChatActionForm() {
         if (chatActionForm) chatActionForm.classList.remove("show");
+        if (chatActionsButtons) chatActionsButtons.style.display = "flex";
         currentChatAction = null;
+        chatActionValue = "";
+    }
+
+    function updateChatActionDisplay() {
+        if (!chatActionDisplay) return;
+        const num = parseFloat(chatActionValue);
+        const formatted = !Number.isNaN(num) ? num.toFixed(2) : "0.00";
+        chatActionDisplay.textContent = `¥${formatted}`;
+    }
+
+    function handleKeypadInput(key) {
+        if (!currentChatAction) return;
+        if (key === "←") {
+            chatActionValue = chatActionValue.slice(0, -1);
+        } else if (key === ".") {
+            if (!chatActionValue.includes('.')) {
+                chatActionValue = chatActionValue ? chatActionValue + '.' : '0.';
+            }
+        } else {
+            const next = chatActionValue ? chatActionValue + key : key;
+            if (chatActionValue.includes('.')) {
+                const decimals = chatActionValue.split('.')[1] || "";
+                if (decimals.length >= 2) return;
+            }
+            chatActionValue = next.replace(/^0+(\d)/, '$1');
+        }
+        updateChatActionDisplay();
+    }
+
+    if (chatActionKeypad) {
+        const keys = ["1","2","3","4","5","6","7","8","9",".","0","←"];
+        chatActionKeypad.innerHTML = "";
+        keys.forEach(key => {
+            const btn = document.createElement("button");
+            btn.textContent = key === "←" ? "⌫" : key;
+            btn.dataset.key = key;
+            btn.addEventListener("click", () => handleKeypadInput(key));
+            chatActionKeypad.appendChild(btn);
+        });
     }
 
     function showRedEnvelopeOverlay(message, chatId) {
@@ -1035,10 +1180,10 @@ function setupWeChat() {
             openChatActionForm(btn.dataset.chataction);
         });
     });
-    if (chatActionConfirm && chatActionAmount) {
+    if (chatActionConfirm) {
         chatActionConfirm.addEventListener("click", () => {
             if (!currentChatAction) return;
-            const amount = parseFloat(chatActionAmount.value);
+            const amount = parseFloat(chatActionValue || "0");
             if (Number.isNaN(amount)) {
                 alert("请输入有效的金额");
                 return;
@@ -1063,6 +1208,7 @@ function setupWeChat() {
     if (chatActionCancel) {
         chatActionCancel.addEventListener("click", () => {
             closeChatActionForm();
+            setChatActions(false);
         });
     }
     if (redEnvelopeConfirm) {

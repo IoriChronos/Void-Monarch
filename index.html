@@ -130,11 +130,13 @@
                                     <button id="wechat-chat-send">发送</button>
                                 </div>
                                 <div class="chat-actions-panel" id="chat-actions-panel">
-                                    <button data-chataction="pay">转账</button>
-                                    <button data-chataction="red">红包</button>
+                                    <div class="chat-actions-buttons" id="chat-actions-buttons">
+                                        <button data-chataction="pay">转账</button>
+                                        <button data-chataction="red">红包</button>
+                                    </div>
                                     <div class="chat-action-form" id="chat-action-form">
-                                        <label id="chat-action-label"></label>
-                                        <input id="chat-action-amount" type="number" step="0.01" min="0" placeholder="输入金额" />
+                                        <div class="chat-action-display" id="chat-action-display">¥0.00</div>
+                                        <div class="chat-action-keypad" id="chat-action-keypad"></div>
                                         <div class="chat-action-form-buttons">
                                             <button id="chat-action-confirm">确认</button>
                                             <button id="chat-action-cancel" type="button">取消</button>
@@ -257,6 +259,7 @@
     <div class="pixel-phone">
         <div class="pixel-screen"></div>
     </div>
+    <div id="phone-toggle-bubble">新消息</div>
 </button>
 
 <script src="config.js"></script>
