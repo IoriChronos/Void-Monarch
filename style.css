@@ -837,8 +837,9 @@ body.mobile-mode #app {
 
 #wechat-page .page-header .back-home { display: none; }
 #wechat-page .page-header {
-    padding: 0;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding: 8px 12px;
+    border-bottom: none;
+    background: transparent;
 }
 #call-page .page-header,
 #memo-page .page-header {
@@ -912,6 +913,8 @@ body.mobile-mode #app {
     font-size: 13px;
     font-weight: 700;
     letter-spacing: 0.04em;
+    flex: 1;
+    text-align: center;
 }
 .wechat-content {
     flex: 1;
@@ -1111,6 +1114,7 @@ body.mobile-mode #app {
     backdrop-filter: blur(10px);
     border-top: 1px solid rgba(255,255,255,0.12);
     margin-top: auto;
+    width: 100%;
 }
 .call-tabs button {
     border-radius: 10px;
@@ -1127,19 +1131,21 @@ body.mobile-mode #app {
     color: #e8f6ff;
 }
 .call-panel {
-    padding: 8px 0;
+    padding: 0;
     display: grid;
     gap: 8px;
     flex: 1;
     min-height: 0;
     overflow: auto;
+    width: 100%;
 }
 .call-panel::-webkit-scrollbar { width: 0; height: 0; }
 .call-item {
     padding: 10px;
-    border-radius: 10px;
+    border-radius: 0;
     background: rgba(0,0,0,0.25);
     border: 1px solid rgba(255,255,255,0.08);
+    width: 100%;
 }
 .call-item .top {
     display: flex;
@@ -1219,7 +1225,7 @@ body.mobile-mode #app {
 .wechat-chat-window {
     border: none;
     border-radius: 0;
-    background: #050407;
+    background: transparent;
     display: none;
     flex-direction: column;
     min-height: 0;
@@ -1232,11 +1238,14 @@ body.mobile-mode #app {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    padding: 10px 12px;
-    gap: 8px;
-    background: rgba(3, 3, 6, 0.92);
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding: 0;
+    gap: 6px;
+    background: transparent;
+    border-bottom: none;
     flex-shrink: 0;
+}
+#chat-head-controls {
+    display: none;
 }
 .chat-window-head button {
     width: 30px;
@@ -1246,12 +1255,6 @@ body.mobile-mode #app {
     background: rgba(0,0,0,0.65);
     color: #fff;
     cursor: pointer;
-}
-.chat-title {
-    font-size: 15px;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    flex: 1;
 }
 .chat-unread-total {
     display: inline-flex;
@@ -1270,8 +1273,8 @@ body.mobile-mode #app {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 12px 10px;
-    background: rgba(24, 18, 28, 0.92);
+    padding: 12px 0;
+    background: transparent;
     overflow: auto;
     scrollbar-width: none;
     touch-action: pan-y;
@@ -1281,7 +1284,7 @@ body.mobile-mode #app {
 .chat-row {
     display: flex;
     gap: 8px;
-    padding: 0 2px 0 4px;
+    padding: 0;
 }
 .chat-row.in { justify-content: flex-start; }
 .chat-row.out { justify-content: flex-end; flex-direction: row-reverse; padding-right: 0; }
@@ -1316,9 +1319,9 @@ body.mobile-mode #app {
 .chat-window-input {
     display: flex;
     gap: 8px;
-    padding: 10px;
-    border-top: 1px solid rgba(255,255,255,0.12);
-    background: rgba(5, 5, 9, 0.9);
+    padding: 10px 0;
+    border-top: none;
+    background: transparent;
     position: sticky;
     bottom: 0;
     flex-shrink: 0;
@@ -1581,7 +1584,7 @@ body.mobile-mode #app {
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 0;
 }
 .memo-controls {
     display: flex;
@@ -1608,7 +1611,7 @@ body.mobile-mode #app {
 }
 .memo-log::-webkit-scrollbar { width: 0; height: 0; }
 .memo-item {
-    border-radius: 12px;
+    border-radius: 0;
     border: 1px solid rgba(255,255,255,0.08);
     padding: 8px 10px;
     background: rgba(255,255,255,0.04);
@@ -1617,6 +1620,7 @@ body.mobile-mode #app {
     display: flex;
     justify-content: space-between;
     gap: 10px;
+    width: 100%;
 }
 .memo-item span {
     font-weight: 600;

@@ -226,6 +226,11 @@ document.addEventListener('DOMContentLoaded', () => {
     memoState.listEl = memoLogEl;
     renderMemoLog();
     if (memoClearBtn) memoClearBtn.addEventListener('click', clearMemoEntries);
+    document.querySelectorAll('[data-call-action]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            handleIslandCallAction(btn.dataset.callAction);
+        });
+    });
 
     /* --------- 剧情系统：只是本地假对话，之后再换 AI --------- */
     const storyLog = document.getElementById('story-log');
@@ -647,7 +652,7 @@ function setupWeChat() {
         wallet: document.getElementById("wechat-wallet"),
     };
     const chatWindow = document.getElementById("wechat-chat-window");
-    const chatTitle = document.getElementById("wechat-chat-title");
+    const chatHeadControls = document.getElementById("chat-head-controls");
     const chatLog = document.getElementById("wechat-chat-log");
     const chatInput = document.getElementById("wechat-chat-input");
     const chatSend = document.getElementById("wechat-chat-send");
@@ -865,6 +870,7 @@ function setupWeChat() {
         });
         if (chatWindow) chatWindow.style.display = "none";
         if (wechatBottom) wechatBottom.style.display = "grid";
+        if (chatHeadControls) chatHeadControls.style.display = "none";
         setChatActions(false);
         hideRedEnvelopeOverlay();
         const unread = totalUnreadCount();
@@ -874,7 +880,6 @@ function setupWeChat() {
             else if (target === "wallet") wechatTop.textContent = "钱包";
         }
         if (target === "chats") hideMessageBanner();
-        setIslandLabel(target === "chats" ? "Wechat" : (target === "moments" ? "朋友圈" : "钱包"));
     }
 
     tabs.forEach(btn => {
@@ -919,11 +924,8 @@ function setupWeChat() {
         chatWindow.dataset.chat = id;
         chatWindow.style.display = "flex";
         if (wechatBottom) wechatBottom.style.display = "none";
-        if (wechatTop && chatTitle) {
-            wechatTop.textContent = c.name;
-            chatTitle.textContent = c.name;
-        }
-        setIslandLabel(c.name);
+        if (wechatTop) wechatTop.textContent = c.name;
+        if (chatHeadControls) chatHeadControls.style.display = "flex";
         renderChats();
     }
 
@@ -1092,7 +1094,6 @@ function setupWeChat() {
     if (chatBack) chatBack.addEventListener("click", () => {
         if (chatWindow) chatWindow.style.display = "none";
         switchTab("chats");
-        setIslandLabel("Wechat");
         hideRedEnvelopeOverlay();
         const top = document.getElementById("wechat-top");
         if (top) top.textContent = `Wechat (${totalUnreadCount()})`;
@@ -1195,7 +1196,6 @@ function setupWeChat() {
     renderMoments();
     renderWallet();
     switchTab("chats");
-    setIslandLabel("Wechat");
 
     updateWalletDisplay();
 
