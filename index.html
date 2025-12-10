@@ -21,8 +21,34 @@
         <footer id="story-input-row">
             <button id="input-collapse-btn" class="hidden">⌄</button>
             <textarea id="story-input" rows="2" placeholder="在这里输入给元书的话…"></textarea>
+            <div class="story-tools">
+                <button id="story-tools-btn" class="pixel-tool-btn" aria-label="更多工具">
+                    <span class="pixel-dot"></span>
+                    <span class="pixel-dot"></span>
+                    <span class="pixel-dot"></span>
+                </button>
+                <div id="story-tools-menu" class="story-tools-menu" aria-hidden="true">
+                    <button id="story-tool-system">
+                        <span class="icon-system"></span>
+                        <span>System Prompt</span>
+                    </button>
+                    <button id="story-tool-restart">
+                        <span class="icon-restart"></span>
+                        <span>Restart</span>
+                    </button>
+                </div>
+            </div>
             <button id="story-send" class="click-anim" >发送</button>
         </footer>
+        <div id="restart-sheet" class="restart-sheet" aria-hidden="true">
+            <div class="sheet-content">
+                <p>重启范围</p>
+                <button data-restart="story">重置剧情记忆</button>
+                <button data-restart="phone">重置手机数据</button>
+                <button data-restart="all">重置全部</button>
+                <button data-restart="cancel" class="ghost">取消</button>
+            </div>
+        </div>
     </section>
 
     <!-- 右侧手机区域（PC 上固定，手机上以弹层方式出现） -->

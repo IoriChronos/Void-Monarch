@@ -7,18 +7,22 @@ import {
 } from "./ui/phone.js";
 import { initDynamicIsland } from "./ui/dynamic-island.js";
 import { initMemoApp, addMemoEntry } from "./apps/memo.js";
-import { initWeChatApp, triggerWeChatNotification, triggerMomentsNotification } from "./apps/wechat.js";
+import { initWeChatApp, triggerWeChatNotification, triggerMomentsNotification, refreshWeChatUI } from "./apps/wechat.js";
 import { handleIslandCallAction, triggerIncomingCall } from "./apps/phone.js";
 import { setTriggerHandlers, checkTriggers } from "./core/triggers.js";
 import { generateNarrativeReply } from "./core/ai.js";
 import { applyAction } from "./core/action-router.js";
 import { getWorldState, addStoryMessage, subscribeWorldState } from "./data/world-state.js";
+import { resetStory, resetPhone, resetAll } from "./core/reset.js";
+import { updateSystemRules, appendDynamicRule } from "./data/system-rules.js";
+import { saveSnapshot } from "./core/timeline.js";
 
 let storyUI = null;
 let storyBound = false;
 
 document.addEventListener("DOMContentLoaded", () => {
     syncStateWithStorage();
+    saveSnapshot("boot");
     initDynamicIsland({ onCallAction: handleIslandCallAction });
     initClock();
     initBattery();
@@ -40,7 +44,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     storyUI = initAIChatWindow({
-        onSubmit: handleStorySubmit
+        onSubmit: handleStorySubmit,
+        onSystemSubmit: handleSystemInput,
+        onRestart: handleRestartRequest,
+        onContinue: handleContinueRequest
     });
     hydrateStoryLog();
     bindStoryStream();
@@ -57,9 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function hydrateStoryLog() {
     const history = getWorldState().story || [];
-    history.forEach(entry => {
-        storyUI.appendBubble(entry.role, entry.text);
-    });
+    storyUI.replaceHistory?.(history);
 }
 
 function bindStoryStream() {
@@ -67,6 +72,7 @@ function bindStoryStream() {
     subscribeWorldState((path, detail) => {
         if (path === "story:append" && detail?.message) {
             storyUI?.appendBubble(detail.message.role, detail.message.text);
+            saveSnapshot(`${detail.message.role}:${Date.now()}`);
         }
     });
     storyBound = true;
@@ -75,6 +81,17 @@ function bindStoryStream() {
 async function handleStorySubmit(text) {
     addStoryMessage("user", text);
     await checkTriggers(text);
+    await requestAIResponse(text, { skipTriggers: true });
+}
+
+async function handleContinueRequest() {
+    await requestAIResponse("继续", { skipUser: true, skipTriggers: true });
+}
+
+async function requestAIResponse(text, options = {}) {
+    if (!options.skipTriggers) {
+        await checkTriggers(text);
+    }
     try {
         const action = await generateNarrativeReply(text);
         if (action) {
@@ -86,6 +103,42 @@ async function handleStorySubmit(text) {
         console.error("AI 剧情回复失败", err);
         addStoryMessage("system", "(AI 无回复)");
     }
+}
+
+function handleSystemInput(raw) {
+    const text = raw.trim();
+    if (!text) return;
+    const colonIndex = text.indexOf(":");
+    if (colonIndex > -1) {
+        const key = text.slice(0, colonIndex).trim().toLowerCase();
+        const value = text.slice(colonIndex + 1).trim();
+        if (!value) return;
+        if (key === "persona" || key === "world" || key === "rules") {
+            updateSystemRules({ [key]: value });
+            return;
+        }
+    }
+    appendDynamicRule(text);
+}
+
+function handleRestartRequest(kind) {
+    if (kind === "story") {
+        resetStory();
+        refreshStoryLogView();
+    } else if (kind === "phone") {
+        resetPhone();
+        refreshWeChatUI();
+    } else if (kind === "all") {
+        resetAll();
+        refreshWeChatUI();
+    }
+    refreshStoryLogView();
+}
+
+function refreshStoryLogView() {
+    if (!storyUI) return;
+    const history = getWorldState().story || [];
+    storyUI.replaceHistory?.(history);
 }
 
 function initClock() {

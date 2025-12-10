@@ -64,6 +64,7 @@ body.mobile-mode #app {
     min-height: 80vh;
     border-radius: 22px;
     padding: 14px 14px 16px;
+    position: relative;
     background:
         radial-gradient(circle at 10% 20%, rgba(120, 40, 65, 0.25), transparent 65%),
         radial-gradient(circle at 60% 60%, rgba(200, 80, 110, 0.18), transparent 65%),
@@ -172,11 +173,211 @@ body.mobile-mode #app {
     min-height: 40px;     /* 两行视觉高度 */
     max-height: 70vh;     /* 最大展开高度 */
     overflow-y: auto;     /* 内部滚动，但条隐藏 */
+    transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+
+#story-input.system-mode {
+    border-color: rgba(255, 220, 120, 0.6);
+    box-shadow: 0 0 8px rgba(255, 220, 120, 0.25);
 }
 
 #story-input::-webkit-scrollbar {
     width: 0;
     height: 0;
+}
+
+.story-tools {
+    position: relative;
+}
+
+.pixel-tool-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(0,0,0,0.45);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    transition: border 0.2s ease, transform 0.2s ease;
+}
+
+.pixel-tool-btn .pixel-dot {
+    width: 6px;
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.8);
+}
+
+.pixel-tool-btn.active {
+    border-color: rgba(255,200,150,0.6);
+    transform: translateY(-1px);
+}
+
+.story-tools-menu {
+    position: absolute;
+    bottom: 44px;
+    right: 0;
+    min-width: 170px;
+    padding: 8px;
+    border-radius: 16px;
+    background: rgba(15,10,18,0.85);
+    border: 1px solid rgba(255,255,255,0.12);
+    backdrop-filter: blur(14px);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(6px) scale(0.98);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    z-index: 12;
+}
+
+.story-tools-menu.show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+}
+
+.story-tools-menu button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    padding: 6px 10px;
+    color: #f5e9f3;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.icon-restart,
+.icon-system {
+    flex-shrink: 0;
+}
+
+.icon-restart {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,255,255,0.8);
+    border-radius: 50%;
+    position: relative;
+}
+
+.icon-restart::after {
+    content: "";
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    border-top: 2px solid rgba(255,255,255,0.8);
+    border-right: 2px solid rgba(255,255,255,0.8);
+    transform: rotate(45deg);
+}
+
+.icon-system {
+    width: 18px;
+    height: 18px;
+    background:
+        radial-gradient(circle, rgba(255,255,255,0.8) 20%, transparent 22%),
+        conic-gradient(
+            transparent 0deg 20deg,
+            rgba(255,255,255,0.8) 20deg 40deg,
+            transparent 40deg 60deg,
+            rgba(255,255,255,0.8) 60deg 80deg,
+            transparent 80deg 100deg,
+            rgba(255,255,255,0.8) 100deg 120deg,
+            transparent 120deg 140deg,
+            rgba(255,255,255,0.8) 140deg 160deg,
+            transparent 160deg 180deg,
+            rgba(255,255,255,0.8) 180deg 200deg,
+            transparent 200deg 220deg,
+            rgba(255,255,255,0.8) 220deg 240deg,
+            transparent 240deg 260deg,
+            rgba(255,255,255,0.8) 260deg 280deg,
+            transparent 280deg 300deg,
+            rgba(255,255,255,0.8) 300deg 320deg,
+            transparent 320deg 360deg
+        );
+    border-radius: 50%;
+}
+
+.restart-sheet {
+    position: absolute;
+    inset: 0;
+    background: rgba(5,5,8,0.55);
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.restart-sheet.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.restart-sheet .sheet-content {
+    width: 100%;
+    max-width: 320px;
+    padding: 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(20,10,16,0.9);
+    backdrop-filter: blur(12px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.restart-sheet .sheet-content p {
+    margin: 0 0 6px;
+    color: rgba(255,255,255,0.8);
+    font-size: 13px;
+    letter-spacing: 0.1em;
+}
+
+.restart-sheet button {
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.08);
+    color: #f5e9f3;
+    padding: 8px 12px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.restart-sheet button.ghost {
+    background: transparent;
+}
+
+.continue-btn {
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.16);
+    backdrop-filter: blur(8px);
+    font-size: 12px;
+    cursor: pointer;
+    margin-left: auto;
+    margin-right: 8px;
+    margin-top: 6px;
+    animation: pulse 2.4s infinite ease-in-out;
+}
+
+@keyframes pulse {
+    0% { opacity: .7; }
+    50% { opacity: 1; }
+    100% { opacity: .7; }
 }
 #story-input {
     scrollbar-width: none;

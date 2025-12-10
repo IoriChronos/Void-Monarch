@@ -2,6 +2,7 @@ import { AI_CONFIG } from "../config.js";
 import { getWorldState } from "../data/world-state.js";
 import { getShortMemory } from "../data/memory-short.js";
 import { getLongMemory, addLongMemory, summarizeAndTrim } from "../data/memory-long.js";
+import { buildSystemPrompt } from "../data/system-rules.js";
 
 export async function askAI(userInput = "") {
     const context = buildContext();
@@ -100,6 +101,9 @@ function buildContext() {
 
 async function callGroq(prompt) {
     try {
+        const systemPrompt = [AI_CONFIG.systemPrompt, buildSystemPrompt()]
+            .filter(Boolean)
+            .join("\n");
         const res = await fetch(AI_CONFIG.apiBase, {
             method: "POST",
             headers: {
@@ -109,7 +113,7 @@ async function callGroq(prompt) {
             body: JSON.stringify({
                 model: AI_CONFIG.model,
                 messages: [
-                    { role: "system", content: AI_CONFIG.systemPrompt },
+                    { role: "system", content: systemPrompt },
                     { role: "user", content: prompt }
                 ]
             })

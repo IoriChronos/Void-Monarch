@@ -985,6 +985,7 @@ export function initWeChatApp() {
         handleIncomingMessage,
         renderChats,
         renderMoments,
+        renderWallet,
         persistMoments,
         addMomentComment,
         publishMoment,
@@ -1075,4 +1076,11 @@ export async function triggerMomentsNotification(detail = {}) {
     } catch (err) {
         console.error("朋友圈触发失败", err);
     }
+}
+
+export function refreshWeChatUI() {
+    if (!weChatRuntime) return;
+    weChatRuntime.renderChats();
+    weChatRuntime.renderMoments();
+    weChatRuntime.renderWallet?.();
 }

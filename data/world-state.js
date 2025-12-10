@@ -152,6 +152,10 @@ function unreadOfChats(chats) {
 let worldState = createDefaultState();
 const listeners = new Set();
 
+export function getSeedState() {
+    return createDefaultState();
+}
+
 export function initializeWorldState(loadedState = null) {
     if (loadedState && typeof loadedState === "object") {
         const base = createDefaultState();
