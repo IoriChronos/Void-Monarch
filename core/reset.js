@@ -1,8 +1,9 @@
 import { getSeedState, updateWorldState, initializeWorldState } from "../data/world-state.js";
-import { hydrateShortMemory } from "../data/memory-short.js";
-import { loadLongMemory } from "../data/memory-long.js";
+import { hydrateShortMemory, clearShortMemory } from "../data/memory-short.js";
+import { loadLongMemory, clearMemory as clearLongMemory } from "../data/memory-long.js";
 import { clearSystemRules } from "../data/system-rules.js";
 import { saveWorldStateSnapshot, saveLongMemorySnapshot } from "./storage.js";
+import { clearSnapshots } from "./timeline.js";
 
 function clone(value) {
     if (typeof window !== "undefined" && window.structuredClone) {
@@ -39,18 +40,25 @@ export function resetPhone() {
         replaceArray(state.callHistory, seed.callHistory);
         state.memoEntries = [];
         state.eventsLog = [];
+        state.triggers = [];
         state.wallet = clone(seed.wallet);
         state.unread = clone(seed.unread);
         state.unreadMomentsCount = seed.unreadMomentsCount;
+        state.lastAppOpened = null;
+        state.blackFog = clone(seed.blackFog);
     }, "reset:phone");
     saveWorldStateSnapshot();
 }
 
 export function resetAll() {
     const seed = getSeedState();
-    initializeWorldState(seed);
-    loadLongMemory([]);
+    const base = clone(seed);
+    clearSnapshots();
+    clearShortMemory();
+    clearLongMemory();
+    initializeWorldState(base);
     hydrateShortMemory(seed.story);
+    loadLongMemory([]);
     clearSystemRules();
     saveWorldStateSnapshot();
     saveLongMemorySnapshot([]);

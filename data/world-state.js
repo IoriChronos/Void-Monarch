@@ -69,7 +69,71 @@ const initialCallHistory = () => ([
 ]);
 
 const defaultStory = [
-    { role: "system", text: "主线从这里开始。你可以先随便说几句，之后我们再把它接到 AI 上。", time: Date.now() }
+    {
+        role: "system",
+        text: "主线从这里开始。你可以先随便说几句，之后我们再把它接到 AI 上。",
+        time: Date.now()
+    },
+    {
+        role: "system",
+        text: "#N 午夜 00:32，便利店外的霓虹像噪点一样闪烁，雨声在天线里折返，整条街只剩你和自己的呼吸。",
+        time: Date.now() + 1
+    },
+    {
+        role: "system",
+        text: "#A 自动门在你身后轻响，他顺势走近，掌心按住你的肩胛，低声勒令：“别走开。”",
+        time: Date.now() + 2
+    },
+    {
+        role: "system",
+        text: "#N 灯光在墙面拖出长线，广播忽然卡顿，像有人在那头慢慢调高音量，提醒你：他正在俯视。",
+        time: Date.now() + 3
+    },
+    {
+        role: "system",
+        text: "#T “他的目光贴得太近，比雨更冷。”",
+        time: Date.now() + 4
+    },
+    {
+        role: "system",
+        text: "#N 你握着的纸杯只剩一口热牛奶，甜味与冷气混在一起，心跳乱成一片。",
+        time: Date.now() + 5
+    },
+    {
+        role: "system",
+        text: "#A **他的指节稳稳扣住**你的下巴，宣告式地说：“提前告诉我你要去哪，别浪费时间。”",
+        time: Date.now() + 6
+    },
+    {
+        role: "system",
+        text: "#N 他把奶油泡芙推到你掌心，糖粉落下来像细小的命令——不许迟到，不许拒绝。",
+        time: Date.now() + 7
+    },
+    {
+        role: "system",
+        text: "#T “要是他真的跟着我回家呢？”",
+        time: Date.now() + 8
+    },
+    {
+        role: "system",
+        text: "#N 黑雾在雨里写下一句短短的答案：别迟到。",
+        time: Date.now() + 9
+    },
+    {
+        role: "system",
+        text: "#S 【通知】守望记录：霓虹信号延迟 0.6 秒。",
+        time: Date.now() + 10
+    },
+    {
+        role: "user",
+        text: "我站在便利店门口。",
+        time: Date.now() + 11
+    },
+    {
+        role: "assistant",
+        text: "“别挡着，靠得再近一点。”",
+        time: Date.now() + 12
+    }
 ];
 
 function createId(prefix = "id") {
@@ -243,6 +307,19 @@ export function trimStoryAfter(messageId) {
     worldState.story.splice(index);
     hydrateShortMemory(worldState.story);
     emit("story:trim", { messageId });
+    return true;
+}
+
+export function editStoryMessage(messageId, text) {
+    if (!messageId || typeof text !== "string") return false;
+    const clean = text.trim();
+    if (!clean) return false;
+    const entry = worldState.story.find(item => item.id === messageId);
+    if (!entry) return false;
+    entry.text = clean;
+    entry.time = Date.now();
+    hydrateShortMemory(worldState.story);
+    emit("story:update", { message: { ...entry } });
     return true;
 }
 

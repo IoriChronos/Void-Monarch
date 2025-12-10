@@ -116,10 +116,36 @@ export async function askAI(userInput = "") {
 }
 
 export async function generateNarrativeReply(userInput) {
-    return requestAction("reply_story", userInput, () => ({
+    // ====== 本地测试版：用于验证气泡、字体、换行、关键词效果 ======
+    const demoText = `
+#N 夜色像被撕开的布料缓缓垂落，深处浮着微光与残响。
+
+#A 他靠近一步，气息贴在你颈侧，像某种**不属于人类的耐心**正在等待。
+
+#T “你现在的心跳，很乱。”
+
+#N 空气被无形力量压弯，你听见什么在黑暗里——  
+像是 *低声的呼唤* ——又像是被逼近的捕食者。
+
+——— 以下是关键词测试 ———
+
+#N 黑雾在脚边盘绕，像是想试探你会不会后退。  
+#N 他的 **凝视** 划开你的影子。  
+#N 一缕 **靠近** 的气息。  
+#N 强制般的 **控制** 落在你的肩上。  
+#N 不容抗拒的 **宣告** 在空气中震荡。  
+#N 夜色里浮出一线 **温度**，却不是温柔——而是占有前的确认。
+    `.trim();
+
+    return {
         action: "reply_story",
-        payload: { text: `【本地】${userInput ? "我听见了。" : "你醒着吗？"}` }
-    }));
+        payload: { 
+            text: demoText,
+            isAI: true,              // ⬅ 必须：告诉引擎这是 AI 回复
+            type: "story",           // ⬅ 必须：强制进入“故事剧情解析”管线
+            meta: { parsed: false }  // ⬅ 强制触发 parser，而不是原样输出
+        }
+    };
 }
 
 export async function generatePhoneMessage(chatId) {

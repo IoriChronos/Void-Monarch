@@ -59,6 +59,10 @@ export function dropSnapshotsAfter(snapshotId) {
     snapshots.splice(index);
 }
 
+export function clearSnapshots() {
+    snapshots.length = 0;
+}
+
 function cryptoRandomId() {
     if (typeof crypto !== "undefined" && crypto.randomUUID) {
         return crypto.randomUUID();

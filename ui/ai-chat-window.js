@@ -1,3 +1,5 @@
+import { renderStoryBubble, initRendererFx } from "./bubble-renderer.js";
+
 export function initAIChatWindow(options = {}) {
     const storyLog = document.getElementById("story-log");
     const storyInput = document.getElementById("story-input");
@@ -12,6 +14,10 @@ export function initAIChatWindow(options = {}) {
     const memorySlider = document.getElementById("long-memory-slider");
     const memoryValue = document.getElementById("long-memory-value");
     const providerSelect = document.getElementById("ai-provider-select");
+    const editSheet = document.getElementById("story-edit-sheet");
+    const editInput = document.getElementById("story-edit-input");
+    const editSaveBtn = document.getElementById("story-edit-save");
+    const editCancelBtn = document.getElementById("story-edit-cancel");
 
     if (!storyLog || !storyInput || !storySend) {
         throw new Error("AI chat window elements missing");
@@ -21,6 +27,15 @@ export function initAIChatWindow(options = {}) {
     let continueBtn = null;
     let contextMenu = null;
     let latestSystemId = null;
+    let lastBubbleFxHandle = null;
+    let editingEntry = null;
+    const sceneFX = initRendererFx();
+    const aiGroupState = {
+        armed: false,
+        started: false,
+        lastBubble: null,
+        startDivider: null
+    };
 
     function limitTwoLines() {
         storyInput.classList.remove("expanded");
@@ -53,9 +68,17 @@ export function initAIChatWindow(options = {}) {
     function appendBubble(entry) {
         if (!storyLog || !entry) return null;
         const role = entry.role || "system";
-        const bubble = document.createElement("div");
-        bubble.className = `story-bubble ${role}`;
-        bubble.textContent = entry.text || "";
+        const rendered = renderStoryBubble(entry, {
+            sceneFX,
+            lastFxHandle: lastBubbleFxHandle
+        });
+        if (!rendered || !rendered.bubble) {
+            if (rendered?.handledFx) {
+                return null;
+            }
+        }
+        const bubble = rendered?.bubble;
+        if (!bubble) return null;
         bubble.dataset.role = role;
         if (entry.id) {
             bubble.dataset.message = entry.id;
@@ -65,8 +88,16 @@ export function initAIChatWindow(options = {}) {
         }
         bubble.__storyEntry = entry;
         attachBubbleMenu(bubble, entry);
+        if (role === "system") {
+            ensureAiGroupStart();
+        } else if (aiGroupState.started && aiGroupState.armed) {
+            endAiReplyGroup();
+        }
         storyLog.appendChild(bubble);
-        storyLog.scrollTop = storyLog.scrollHeight;
+        if (role === "system" && aiGroupState.armed) {
+            aiGroupState.lastBubble = bubble;
+        }
+        scrollToBottom();
         if (continueBtn) {
             continueBtn.remove();
             continueBtn = null;
@@ -74,7 +105,7 @@ export function initAIChatWindow(options = {}) {
         if (role === "system") {
             latestSystemId = entry.id || latestSystemId;
             continueBtn = document.createElement("button");
-            continueBtn.className = "continue-btn";
+            continueBtn.className = "continue-btn align-left";
             continueBtn.textContent = "继续说";
             continueBtn.addEventListener("click", () => {
                 const handler = options.onContinue;
@@ -83,7 +114,9 @@ export function initAIChatWindow(options = {}) {
                 handler?.();
             }, { once: true });
             bubble.insertAdjacentElement("afterend", continueBtn);
+            scrollToBottom();
         }
+        lastBubbleFxHandle = rendered.fxHandle || lastBubbleFxHandle;
         return bubble;
     }
 
@@ -110,7 +143,11 @@ export function initAIChatWindow(options = {}) {
             btn.type = "button";
             btn.textContent = action.label;
             btn.addEventListener("click", () => {
-                options.onBubbleAction?.(action.id, entry);
+                if (action.id === "edit") {
+                    openEditDialog(entry);
+                } else {
+                    options.onBubbleAction?.(action.id, entry);
+                }
                 closeBubbleMenu();
             });
             panel.appendChild(btn);
@@ -161,6 +198,9 @@ export function initAIChatWindow(options = {}) {
         }
         if (entry.role === "system" && entry.id && entry.id === latestSystemId) {
             items.push({ id: "retry", label: "重说这一句" });
+        }
+        if (entry.role === "system") {
+            items.push({ id: "edit", label: "编辑这一句" });
         }
         return items;
     }
@@ -265,6 +305,19 @@ export function initAIChatWindow(options = {}) {
         }
     });
 
+    editCancelBtn?.addEventListener("click", closeEditDialog);
+    editSaveBtn?.addEventListener("click", submitEditDialog);
+    editSheet?.addEventListener("click", (event) => {
+        if (event.target === editSheet) {
+            closeEditDialog();
+        }
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            closeEditDialog();
+        }
+    });
+
     function initMemorySliderControl() {
         if (!memorySlider || !memoryValue) return;
         const startValue = Number(options.longMemoryLimit) || Number(memorySlider.value) || 3;
@@ -320,6 +373,135 @@ export function initAIChatWindow(options = {}) {
         latestSystemId = lastSystem?.id || null;
     }
 
+    function scrollToBottom() {
+        if (!storyLog) return;
+        requestAnimationFrame(() => {
+            storyLog.scrollTop = storyLog.scrollHeight;
+        });
+    }
+
+    function resetAiGroupState() {
+        aiGroupState.armed = false;
+        aiGroupState.started = false;
+        aiGroupState.lastBubble = null;
+        if (aiGroupState.startDivider) {
+            aiGroupState.startDivider.remove();
+            aiGroupState.startDivider = null;
+        }
+    }
+
+    function ensureAiGroupStart() {
+        if (!aiGroupState.armed || aiGroupState.started || !storyLog) return;
+        const divider = createDivider("start");
+        storyLog.appendChild(divider);
+        aiGroupState.started = true;
+        aiGroupState.startDivider = divider;
+    }
+
+    function beginAiReplyGroup() {
+        if (aiGroupState.armed) {
+            endAiReplyGroup();
+        }
+        aiGroupState.armed = true;
+        aiGroupState.started = false;
+        aiGroupState.lastBubble = null;
+        if (aiGroupState.startDivider) {
+            aiGroupState.startDivider.remove();
+            aiGroupState.startDivider = null;
+        }
+    }
+
+    function endAiReplyGroup() {
+        if (aiGroupState.armed && aiGroupState.started && aiGroupState.lastBubble) {
+            const divider = createDivider("end");
+            insertAfter(aiGroupState.lastBubble, divider);
+        } else if (aiGroupState.startDivider) {
+            aiGroupState.startDivider.remove();
+        }
+        aiGroupState.armed = false;
+        aiGroupState.started = false;
+        aiGroupState.lastBubble = null;
+        aiGroupState.startDivider = null;
+        scrollToBottom();
+    }
+
+    function insertAfter(reference, node) {
+        if (!reference || !reference.parentNode || !node) return;
+        if (reference.nextSibling) {
+            reference.parentNode.insertBefore(node, reference.nextSibling);
+        } else {
+            reference.parentNode.appendChild(node);
+        }
+    }
+
+    function createDivider(type) {
+        const divider = document.createElement("div");
+        divider.className = `story-reply-divider ${type}`;
+        divider.innerHTML = `<span>${type === "start" ? "AI · 回复开始" : "AI · 回复结束"}</span>`;
+        return divider;
+    }
+
+    function openEditDialog(entry) {
+        if (!options.onEditMessage || !editSheet || !editInput) return;
+        editingEntry = entry;
+        editInput.value = entry?.text || "";
+        editSheet.classList.add("show");
+        editSheet.setAttribute("aria-hidden", "false");
+        requestAnimationFrame(() => editInput.focus());
+    }
+
+    function closeEditDialog() {
+        if (!editSheet) return;
+        editSheet.classList.remove("show");
+        editSheet.setAttribute("aria-hidden", "true");
+        editingEntry = null;
+        if (editSaveBtn) {
+            editSaveBtn.disabled = false;
+        }
+    }
+
+    async function submitEditDialog() {
+        if (!editingEntry || !editInput) return;
+        const content = editInput.value.trim();
+        if (!content) return;
+        if (editSaveBtn) {
+            editSaveBtn.disabled = true;
+        }
+        let result = true;
+        try {
+            result = await options.onEditMessage?.(editingEntry, content);
+        } catch (err) {
+            console.error("edit apply failed", err);
+            result = false;
+        }
+        if (editSaveBtn) {
+            editSaveBtn.disabled = false;
+        }
+        if (result === false) return;
+        closeEditDialog();
+    }
+
+    function updateBubble(entry) {
+        if (!entry || !storyLog) return;
+        const target = storyLog.querySelector(`[data-message="${entry.id}"]`);
+        if (!target) return;
+        const snapshotId = target.dataset.snapshot;
+        const rendered = renderStoryBubble(entry, { sceneFX });
+        if (!rendered?.bubble) return;
+        const bubble = rendered.bubble;
+        bubble.dataset.role = entry.role || "system";
+        bubble.dataset.message = entry.id;
+        if (snapshotId) {
+            bubble.dataset.snapshot = snapshotId;
+        }
+        bubble.__storyEntry = entry;
+        attachBubbleMenu(bubble, entry);
+        target.replaceWith(bubble);
+        if (entry.role === "system" && aiGroupState.armed) {
+            aiGroupState.lastBubble = bubble;
+        }
+    }
+
     initProviderControl();
     initMemorySliderControl();
     limitTwoLines();
@@ -333,12 +515,17 @@ export function initAIChatWindow(options = {}) {
             continueBtn = null;
             closeBubbleMenu();
             latestSystemId = null;
+            resetAiGroupState();
             entries.forEach(entry => appendBubble(entry));
             refreshLatestSystem(entries);
+            scrollToBottom();
         },
         exitSystemMode: () => toggleSystemMode(false),
         setBubbleSnapshot: setBubbleSnapshot,
         scrollToSnapshot,
-        showTimelineToast: showToast
+        showTimelineToast: showToast,
+        beginAiReplyGroup,
+        endAiReplyGroup,
+        updateBubble
     };
 }
