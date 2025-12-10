@@ -55,6 +55,10 @@
                     <div class="unlock-face">🙂</div>
                     <div class="unlock-check">✅</div>
                 </div>
+                <div id="message-banner" aria-hidden="true">
+                    <div class="message-banner-title" id="message-banner-title">元书</div>
+                    <div class="message-banner-text" id="message-banner-text">···</div>
+                </div>
             <div id="phone">
 
 
@@ -94,6 +98,10 @@
                 <div id="wechat-page" class="app-page" style="display:none;">
                     <div class="page-header">
                         <button class="back-home">‹</button>
+                        <div class="chat-window-head" id="chat-head-controls" style="display:none;">
+                            <button id="chat-back" aria-label="返回">‹</button>
+                            <span class="chat-unread-total" id="chat-unread-total" style="display:none;"></span>
+                        </div>
                         <div class="wechat-top" id="wechat-top">Wechat (3)</div>
                     </div>
                     <div class="app-scroll wechat-body">
@@ -115,11 +123,6 @@
                                 <div class="wallet-actions" id="wallet-actions"></div>
                             </div>
                             <div class="wechat-chat-window" id="wechat-chat-window" style="display:none;">
-                                <div class="chat-window-head">
-                                    <button id="chat-back" aria-label="返回">‹</button>
-                                    <span class="chat-unread-total" id="chat-unread-total" style="display:none;"></span>
-                                    <div class="chat-title" id="wechat-chat-title"></div>
-                                </div>
                                 <div class="chat-window-log" id="wechat-chat-log"></div>
                                 <div class="chat-window-input">
                                     <button id="chat-actions-toggle" aria-label="更多功能">＋</button>

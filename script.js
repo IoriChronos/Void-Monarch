@@ -667,6 +667,9 @@ function setupWeChat() {
     const redEnvelopeOverlay = document.getElementById("red-envelope-overlay");
     const redEnvelopeAmount = document.getElementById("red-envelope-amount");
     const redEnvelopeConfirm = document.getElementById("red-envelope-confirm");
+    const messageBanner = document.getElementById("message-banner");
+    const messageBannerTitle = document.getElementById("message-banner-title");
+    const messageBannerText = document.getElementById("message-banner-text");
     let walletBalance = 2180.0;
     let pendingRedEnvelope = null;
     let chatActionsOpen = false;
@@ -675,6 +678,8 @@ function setupWeChat() {
         pay: { type: "pay", label: "转账金额（≤1,000,000）", min: 0.01, max: 1000000, defaultValue: 520.00 },
         red: { type: "red", label: "红包金额（0-200）", min: 0, max: 200, defaultValue: 66.00 },
     };
+    let messageBannerTimer = null;
+    let messageBannerTarget = null;
 
     const chats = [
         { id: "yuan", name: "元书", preview: "“靠近一点。”", icon: "◻", time: "刚刚", unread: 1, log: [
@@ -715,6 +720,43 @@ function setupWeChat() {
 
     function updateWalletDisplay() {
         if (walletAmtEl) walletAmtEl.textContent = `¥ ${walletBalance.toFixed(2)}`;
+    }
+
+    function showMessageBanner(title, text, chatId) {
+        if (!messageBanner || !messageBannerTitle || !messageBannerText) return;
+        messageBannerTitle.textContent = title || "微信";
+        messageBannerText.textContent = text || "";
+        messageBannerTarget = chatId || null;
+        messageBanner.classList.add("show");
+        messageBanner.setAttribute("aria-hidden", "false");
+        if (messageBannerTimer) clearTimeout(messageBannerTimer);
+        messageBannerTimer = setTimeout(() => hideMessageBanner(), 3200);
+    }
+
+    function hideMessageBanner() {
+        if (!messageBanner) return;
+        messageBanner.classList.remove("show");
+        messageBanner.setAttribute("aria-hidden", "true");
+        if (messageBannerTimer) {
+            clearTimeout(messageBannerTimer);
+            messageBannerTimer = null;
+        }
+        messageBannerTarget = null;
+    }
+
+    function notifyChatMessage(chat, msg) {
+        if (!chat || !msg) return;
+        const preview = formatChatText(msg) || msg.text || "";
+        showMessageBanner(chat.name, preview, chat.id);
+    }
+
+    if (messageBanner) {
+        messageBanner.addEventListener("click", () => {
+            if (messageBannerTarget) {
+                openChat(messageBannerTarget);
+            }
+            hideMessageBanner();
+        });
     }
 
     const walletActions = [
@@ -807,6 +849,10 @@ function setupWeChat() {
         });
     }
 
+    function isChatActive(id) {
+        return chatWindow && chatWindow.style.display !== "none" && chatWindow.dataset.chat === id;
+    }
+
     function switchTab(target) {
         tabs.forEach(btn => btn.classList.toggle("active", btn.dataset.wtab === target));
         Object.entries(panels).forEach(([key, el]) => {
@@ -827,6 +873,7 @@ function setupWeChat() {
             else if (target === "moments") wechatTop.textContent = "朋友圈";
             else if (target === "wallet") wechatTop.textContent = "钱包";
         }
+        if (target === "chats") hideMessageBanner();
         setIslandLabel(target === "chats" ? "Wechat" : (target === "moments" ? "朋友圈" : "钱包"));
     }
 
@@ -845,6 +892,7 @@ function setupWeChat() {
         });
         setChatActions(false);
         hideRedEnvelopeOverlay();
+        hideMessageBanner();
         chatLog.innerHTML = "";
         c.log.forEach(m => {
             const b = document.createElement("div");
@@ -951,17 +999,20 @@ function setupWeChat() {
         openChat(id);
         renderChats();
         setTimeout(() => {
-            c.log.push({ from:"in", text:"“我听见了。”" });
+            const replyMsg = { from:"in", text:"“我听见了。”" };
+            c.log.push(replyMsg);
             c.preview = "“我听见了。”";
             c.time = "刚刚";
-            const active = chatWindow && chatWindow.style.display !== "none" && chatWindow.dataset.chat === id;
-            if (!active) c.unread = (c.unread || 0) + 1;
+            const active = isChatActive(id);
+            if (!active) {
+                c.unread = (c.unread || 0) + 1;
+                notifyChatMessage(c, replyMsg);
+            }
             if (active) {
                 openChat(id);
             } else {
                 renderChats();
             }
-            triggerIslandNotify("微信新消息");
         }, 500);
     }
 
@@ -1045,6 +1096,7 @@ function setupWeChat() {
         hideRedEnvelopeOverlay();
         const top = document.getElementById("wechat-top");
         if (top) top.textContent = `Wechat (${totalUnreadCount()})`;
+        hideMessageBanner();
     });
 
     /* 电话页：记录/联系人/拨号 */
@@ -1152,16 +1204,21 @@ function setupWeChat() {
         icon.addEventListener('click', () => {
             const targetChat = chats.find(x => x.id === "yuan");
             if (targetChat) {
+                const wasActive = isChatActive(targetChat.id);
                 targetChat.log.push({ from:"in", text:"黑雾覆盖：他在看你。" });
                 targetChat.log.push({ from:"in", text:"红包 ¥18.00", kind:"red", amount: 18.00, redeemed: false });
                 targetChat.log.push({ from:"in", text:"转账 ¥66.00", kind:"pay", amount: 66.00 });
                 targetChat.preview = "转账 ¥66.00";
                 targetChat.time = "刚刚";
-                targetChat.unread = (targetChat.unread || 0) + 3;
+                if (wasActive) {
+                    openChat(targetChat.id);
+                } else {
+                    targetChat.unread = (targetChat.unread || 0) + 3;
+                    notifyChatMessage(targetChat, targetChat.log[targetChat.log.length - 1]);
+                }
                 walletBalance += 66;
                 updateWalletDisplay();
                 renderChats();
-                triggerIslandNotify("微信新消息");
             }
         });
     });

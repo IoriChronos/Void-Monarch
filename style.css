@@ -728,6 +728,39 @@ body.mobile-mode #app {
     pointer-events: none; /* 内容不阻挡点击 */
 }
 
+#message-banner {
+    position: absolute;
+    top: 58px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 40px);
+    max-width: 300px;
+    border-radius: 16px;
+    background: rgba(10,10,14,0.92);
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 10px 14px;
+    color: #f6f3f7;
+    font-size: 12px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease;
+    z-index: 150;
+    cursor: pointer;
+}
+#message-banner.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    pointer-events: auto;
+}
+.message-banner-title {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+.message-banner-text {
+    color: rgba(255,255,255,0.8);
+}
+
 /* 手机内屏内容 */
 #home-screen,
 .app-page {
@@ -803,6 +836,14 @@ body.mobile-mode #app {
 }
 
 #wechat-page .page-header .back-home { display: none; }
+#wechat-page .page-header {
+    padding: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+#call-page .page-header,
+#memo-page .page-header {
+    padding: 0 0 10px;
+}
 
 .page-header .back-home {
     width: 24px;
@@ -865,13 +906,21 @@ body.mobile-mode #app {
     position: relative;
     min-height: 0;
     overflow: hidden;
+    padding: 0;
 }
 .wechat-top {
     font-size: 13px;
     font-weight: 700;
     letter-spacing: 0.04em;
 }
-.wechat-content { flex: 1; display: flex; flex-direction: column; gap: 0; }
+.wechat-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: 100%;
+    min-height: 0;
+}
 .wechat-tabs {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -897,7 +946,9 @@ body.mobile-mode #app {
     bottom: 4px;
     margin-top: auto;
     border-top: 1px solid rgba(255,255,255,0.12);
-    padding-top: 7px;
+    padding: 7px 0 4px;
+    background: linear-gradient(180deg, rgba(5,5,8,0), rgba(5,5,8,0.85));
+    backdrop-filter: blur(10px);
 }
 .wechat-panel {
     border: none;
@@ -912,11 +963,12 @@ body.mobile-mode #app {
 }
 .wechat-moments-wrap {
     padding: 0;
-    overflow: hidden;
+    overflow-y: auto;
     height: 100%;
     display: flex;
     flex-direction: column;
 }
+.wechat-moments-wrap::-webkit-scrollbar { width: 0; }
 .moments-hero {
     position: relative;
     height: 220px;
@@ -943,7 +995,6 @@ body.mobile-mode #app {
     gap: 10px;
     flex: 1;
     min-height: 0;
-    overflow: auto;
 }
 .wc-item {
     display: flex;
@@ -1053,7 +1104,7 @@ body.mobile-mode #app {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 6px;
-    padding: 8px;
+    padding: 8px 0;
     position: sticky;
     bottom: 0;
     background: rgba(0,0,0,0.45);
@@ -1076,13 +1127,14 @@ body.mobile-mode #app {
     color: #e8f6ff;
 }
 .call-panel {
-    padding: 8px;
+    padding: 8px 0;
     display: grid;
     gap: 8px;
     flex: 1;
     min-height: 0;
     overflow: auto;
 }
+.call-panel::-webkit-scrollbar { width: 0; height: 0; }
 .call-item {
     padding: 10px;
     border-radius: 10px;
@@ -1184,6 +1236,7 @@ body.mobile-mode #app {
     gap: 8px;
     background: rgba(3, 3, 6, 0.92);
     border-bottom: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
 }
 .chat-window-head button {
     width: 30px;
@@ -1268,6 +1321,7 @@ body.mobile-mode #app {
     background: rgba(5, 5, 9, 0.9);
     position: sticky;
     bottom: 0;
+    flex-shrink: 0;
 }
 .chat-window-input input {
     flex: 1;
@@ -1524,7 +1578,7 @@ body.mobile-mode #app {
 }
 
 .memo-body {
-    padding: 10px 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -1532,6 +1586,7 @@ body.mobile-mode #app {
 .memo-controls {
     display: flex;
     justify-content: flex-end;
+    padding: 10px 0;
 }
 .memo-controls button {
     border-radius: 12px;
@@ -1549,7 +1604,9 @@ body.mobile-mode #app {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    padding-bottom: 10px;
 }
+.memo-log::-webkit-scrollbar { width: 0; height: 0; }
 .memo-item {
     border-radius: 12px;
     border: 1px solid rgba(255,255,255,0.08);
