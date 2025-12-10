@@ -1122,37 +1122,64 @@ body.mobile-mode #app {
     background: rgba(120,200,140,0.2);
     border-color: rgba(120,200,140,0.6);
 }
-.moment-template-panel {
+.moment-comment-panel {
     margin-top: 6px;
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
     padding: 8px;
-    background: rgba(0,0,0,0.25);
+    background: rgba(0,0,0,0.32);
     display: none;
     flex-direction: column;
     gap: 6px;
 }
-.moment-template-panel.show {
+.moment-comment-panel.show {
     display: flex;
 }
-.moment-template-panel .section-label {
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    opacity: 0.7;
+.moment-comment-input {
+    width: 100%;
+    min-height: 48px;
+    resize: none;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(0,0,0,0.45);
+    color: #f6f3ff;
+    font-size: 12px;
+    padding: 8px 10px;
 }
-.moment-template-panel .template-chips {
+.moment-comment-input:focus {
+    outline: 1px solid rgba(255,255,255,0.26);
+}
+.moment-comment-controls {
     display: flex;
+    justify-content: flex-end;
+}
+.moment-send-btn {
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    font-size: 11px;
+    padding: 4px 16px;
+}
+.mention-menu {
+    display: none;
     flex-wrap: wrap;
     gap: 6px;
 }
-.moment-template-panel .template-chips button {
+.mention-menu.open {
+    display: flex;
+}
+.mention-menu button {
     border-radius: 999px;
     border: 1px solid rgba(255,255,255,0.18);
     background: rgba(255,255,255,0.08);
     color: #fff;
     font-size: 10px;
     padding: 4px 10px;
+}
+.mention-empty {
+    font-size: 10px;
+    opacity: 0.6;
 }
 .moment-comments {
     margin-top: 6px;

@@ -81,10 +81,12 @@ export function initWeChatApp() {
         return getState("phone.calls") || [];
     }
 
-    const momentTemplates = {
-        comment: ["看见你了。", "留意安全。", "别太累。"],
-        mention: ["@你 在吗？", "@你 别怕，我在。", "@你 记得回信。"]
-    };
+    function getMentionContacts() {
+        return (getState("contacts") || []).map(c => ({
+            id: c.id,
+            name: c.name || c.id
+        }));
+    }
 
     async function addMomentComment(moment, text, type = "comment") {
         if (!moment || !text) return;
@@ -217,6 +219,7 @@ export function initWeChatApp() {
         const wrap = momentsFeed;
         if (!wrap) return;
         wrap.innerHTML = "";
+        const mentionContacts = getMentionContacts();
         moments.forEach(m => {
             const div = document.createElement("div");
             div.className = "moment-card";
@@ -230,7 +233,7 @@ export function initWeChatApp() {
                 <div class="moment-actions">
                     <button class="like" data-act="like">${m.likedByUser ? "取消赞" : "赞一下"}</button>
                     <button data-act="comment">评论</button>
-                    <button data-act="mention">@TA</button>
+                    <button data-act="mention">@联系人</button>
                 </div>
             `;
             div.querySelector('[data-act="like"]').addEventListener("click", () => {
@@ -238,46 +241,78 @@ export function initWeChatApp() {
                 m.likes = Math.max(0, m.likes + (m.likedByUser ? 1 : -1));
                 renderMoments();
             });
-            const templatePanel = document.createElement("div");
-            templatePanel.className = "moment-template-panel";
-            const commentLabel = document.createElement("div");
-            commentLabel.className = "section-label";
-            commentLabel.textContent = "评论模版";
-            const commentWrap = document.createElement("div");
-            commentWrap.className = "template-chips";
-            momentTemplates.comment.forEach(text => {
-                const btn = document.createElement("button");
-                btn.textContent = text;
-                btn.addEventListener("click", () => {
-                    addMomentComment(m, text, "comment").catch(err => console.error(err));
+            const commentPanel = document.createElement("div");
+            commentPanel.className = "moment-comment-panel";
+            const commentInput = document.createElement("textarea");
+            commentInput.className = "moment-comment-input";
+            commentInput.rows = 2;
+            commentInput.placeholder = "输入评论…";
+            const controls = document.createElement("div");
+            controls.className = "moment-comment-controls";
+            const sendBtn = document.createElement("button");
+            sendBtn.type = "button";
+            sendBtn.className = "moment-send-btn";
+            sendBtn.textContent = "发送";
+            controls.appendChild(sendBtn);
+            const mentionMenu = document.createElement("div");
+            mentionMenu.className = "mention-menu";
+            mentionMenu.setAttribute("aria-hidden", "true");
+            if (mentionContacts.length) {
+                mentionContacts.forEach(contact => {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.textContent = contact.name;
+                    btn.addEventListener("click", () => {
+                        if (commentInput.value && !commentInput.value.endsWith(" ")) {
+                            commentInput.value += " ";
+                        }
+                        commentInput.value += `@${contact.name} `;
+                        mentionMenu.classList.remove("open");
+                        mentionMenu.setAttribute("aria-hidden", "true");
+                        commentInput.focus();
+                    });
+                    mentionMenu.appendChild(btn);
                 });
-                commentWrap.appendChild(btn);
-            });
-            const mentionLabel = document.createElement("div");
-            mentionLabel.className = "section-label";
-            mentionLabel.textContent = "@ 模版";
-            const mentionWrap = document.createElement("div");
-            mentionWrap.className = "template-chips";
-            momentTemplates.mention.forEach(text => {
-                const btn = document.createElement("button");
-                btn.textContent = text;
-                btn.addEventListener("click", () => {
-                    addMomentComment(m, text, "mention").catch(err => console.error(err));
-                });
-                mentionWrap.appendChild(btn);
-            });
-            templatePanel.appendChild(commentLabel);
-            templatePanel.appendChild(commentWrap);
-            templatePanel.appendChild(mentionLabel);
-            templatePanel.appendChild(mentionWrap);
-            div.appendChild(templatePanel);
+            } else {
+                const empty = document.createElement("span");
+                empty.className = "mention-empty";
+                empty.textContent = "暂无联系人";
+                mentionMenu.appendChild(empty);
+            }
+            commentPanel.appendChild(commentInput);
+            commentPanel.appendChild(controls);
+            commentPanel.appendChild(mentionMenu);
+            div.appendChild(commentPanel);
             const commentBtn = div.querySelector('[data-act="comment"]');
             const mentionBtn = div.querySelector('[data-act="mention"]');
-            const togglePanel = () => {
-                templatePanel.classList.toggle("show");
+            const togglePanel = (show) => {
+                const next = typeof show === "boolean" ? show : !commentPanel.classList.contains("show");
+                commentPanel.classList.toggle("show", next);
+                if (next) {
+                    commentInput.focus();
+                } else {
+                    mentionMenu.classList.remove("open");
+                    mentionMenu.setAttribute("aria-hidden", "true");
+                }
             };
-            if (commentBtn) commentBtn.addEventListener("click", togglePanel);
-            if (mentionBtn) mentionBtn.addEventListener("click", togglePanel);
+            const toggleMention = () => {
+                togglePanel(true);
+                const open = !mentionMenu.classList.contains("open");
+                mentionMenu.classList.toggle("open", open);
+                mentionMenu.setAttribute("aria-hidden", String(!open));
+                if (open) commentInput.focus();
+            };
+            if (commentBtn) commentBtn.addEventListener("click", () => togglePanel());
+            if (mentionBtn) mentionBtn.addEventListener("click", () => toggleMention());
+            sendBtn.addEventListener("click", () => {
+                const text = commentInput.value.trim();
+                if (!text) return;
+                const type = text.includes("@") ? "mention" : "comment";
+                commentInput.value = "";
+                mentionMenu.classList.remove("open");
+                mentionMenu.setAttribute("aria-hidden", "true");
+                addMomentComment(m, text, type).catch(err => console.error(err));
+            });
             if (m.comments && m.comments.length) {
                 const commentsBlock = document.createElement("div");
                 commentsBlock.className = "moment-comments";
