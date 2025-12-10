@@ -57,9 +57,9 @@ const initialChats = () => ([
 ]);
 
 const initialMoments = () => ([
-    { id: "m1", who: "你", text: "今天只是想确认一件事：你有没有在看我。", time: "刚刚", likes: 23, likedByUser: false, comments: [] },
-    { id: "m2", who: "未知信号", text: "今晚的城很安静，像在等一场失控。", time: "1 小时前", likes: 9, likedByUser: false, comments: [] },
-    { id: "m3", who: "甜品店老板", text: "提前留了三盒奶油泡芙，希望他别发火。", time: "2 小时前", likes: 12, likedByUser: false, comments: [] }
+    { id: "m1", who: "你", authorId: "player", text: "今天只是想确认一件事：你有没有在看我。", time: "刚刚", likes: 23, likedByUser: false, comments: [] },
+    { id: "m2", who: "未知信号", authorId: "shadow", text: "今晚的城很安静，像在等一场失控。", time: "1 小时前", likes: 9, likedByUser: false, comments: [] },
+    { id: "m3", who: "甜品店老板", authorId: "sys", text: "提前留了三盒奶油泡芙，希望他别发火。", time: "2 小时前", likes: 12, likedByUser: false, comments: [] }
 ]);
 
 const initialCallHistory = () => ([
@@ -79,7 +79,7 @@ function createDefaultState() {
         contacts: initialContacts.map(c => ({ ...c })),
         chats: initialChats().map(enrichChat),
         chatOrder: ["yuan", "room", "shadow", "sys"],
-        moments: initialMoments().map(enrichMoment),
+        moments: initialMoments().map(moment => enrichMoment(moment, initialContacts)),
         callHistory: initialCallHistory().map(entry => ({ ...entry })),
         memoEntries: [],
         eventsLog: [],
@@ -92,7 +92,8 @@ function createDefaultState() {
         },
         blackFog: { nodes: [], lastTrigger: null },
         triggers: [],
-        lastAppOpened: null
+        lastAppOpened: null,
+        unreadMomentsCount: 0
     };
 }
 
@@ -109,7 +110,7 @@ function enrichChat(chat) {
     };
 }
 
-function enrichMoment(moment) {
+function enrichMoment(moment, contactsSource = initialContacts) {
     return {
         id: moment.id || `moment-${Math.random().toString(36).slice(2, 7)}`,
         who: moment.who,
@@ -117,8 +118,20 @@ function enrichMoment(moment) {
         time: moment.time || "刚刚",
         likes: moment.likes || 0,
         likedByUser: Boolean(moment.likedByUser),
-        comments: (moment.comments || []).map(c => ({ ...c }))
+        authorId: moment.authorId || deriveAuthorId(moment.who, contactsSource),
+        comments: (moment.comments || []).map(c => ({
+            ...c,
+            authorId: c.authorId || null,
+            mentions: c.mentions || []
+        }))
     };
+}
+
+function deriveAuthorId(name, contactsSource = initialContacts) {
+    if (!name) return null;
+    if (name === "你") return "player";
+    const contact = (contactsSource || initialContacts).find(c => c.name === name);
+    return contact ? contact.id : null;
 }
 
 function computeChatPreview(log = []) {
@@ -149,7 +162,7 @@ export function initializeWorldState(loadedState = null) {
         worldState.contacts = (loadedState.contacts || base.contacts).map(c => ({ ...c }));
         worldState.chats = (loadedState.chats || base.chats).map(enrichChat);
         worldState.chatOrder = loadedState.chatOrder || base.chatOrder;
-        worldState.moments = (loadedState.moments || base.moments).map(enrichMoment);
+        worldState.moments = (loadedState.moments || base.moments).map(moment => enrichMoment(moment, worldState.contacts));
         worldState.callHistory = (loadedState.callHistory || base.callHistory).map(entry => ({ ...entry }));
         worldState.memoEntries = (loadedState.memoEntries || []).slice(-50);
         worldState.eventsLog = (loadedState.eventsLog || []).slice(-100);
@@ -159,6 +172,7 @@ export function initializeWorldState(loadedState = null) {
         worldState.unread = loadedState.unread || base.unread;
         worldState.triggers = (loadedState.triggers || base.triggers).slice(-20);
         worldState.lastAppOpened = loadedState.lastAppOpened || base.lastAppOpened;
+        worldState.unreadMomentsCount = loadedState.unreadMomentsCount || base.unreadMomentsCount;
     } else {
         worldState = createDefaultState();
     }
@@ -242,7 +256,9 @@ export function addMomentComment(momentId, comment) {
         from: comment.from || "你",
         text: comment.text || "",
         type: comment.type || "comment",
-        time: comment.time || Date.now()
+        time: comment.time || Date.now(),
+        authorId: comment.authorId || null,
+        mentions: comment.mentions || []
     };
     moment.comments = moment.comments || [];
     moment.comments.push(entry);
@@ -253,9 +269,23 @@ export function addMomentPost(post) {
     const entry = enrichMoment({
         ...post,
         id: post.id || `moment-${Date.now()}`
-    });
+    }, worldState.contacts);
     worldState.moments.unshift(entry);
     emit("moments:post", { post: entry });
+}
+
+export function incrementMomentsUnread(delta = 1) {
+    const amount = Number.isFinite(delta) ? delta : 1;
+    const next = Math.max(0, (worldState.unreadMomentsCount || 0) + amount);
+    if (next === worldState.unreadMomentsCount) return;
+    worldState.unreadMomentsCount = next;
+    emit("moments:unread", { count: worldState.unreadMomentsCount });
+}
+
+export function clearMomentsUnread() {
+    if (!worldState.unreadMomentsCount) return;
+    worldState.unreadMomentsCount = 0;
+    emit("moments:unread", { count: 0 });
 }
 
 export function addCallLog(entry) {

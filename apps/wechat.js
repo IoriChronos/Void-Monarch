@@ -5,9 +5,12 @@ import {
     triggerOutgoingCall
 } from "./phone.js";
 import { openPhonePage, showPhoneFloatingAlert } from "../ui/phone.js";
+import { triggerIslandNotify } from "../ui/dynamic-island.js";
+import { incrementMomentsUnread, clearMomentsUnread } from "../data/world-state.js";
 
 let weChatRuntime = null;
 const PLAYER_ID = "player";
+const PLAYER_ALIASES = ["你", "自己", "me", "self"];
 
 export function initWeChatApp() {
     const tabs = document.querySelectorAll(".wechat-tabs button");
@@ -43,6 +46,7 @@ export function initWeChatApp() {
     const messageBanner = document.getElementById("message-banner");
     const messageBannerTitle = document.getElementById("message-banner-title");
     const messageBannerText = document.getElementById("message-banner-text");
+    const momentsTabButton = document.querySelector('[data-wtab="moments"]');
     const chats = getState("phone.chats") || [];
     const moments = getState("phone.moments") || [];
     const wallet = getState("phone.wallet") || { balance: 0 };
@@ -57,6 +61,8 @@ export function initWeChatApp() {
     };
     let messageBannerTimer = null;
     let messageBannerTarget = null;
+    let unreadMomentsCount = getState("unreadMomentsCount") || 0;
+    updateMomentsBadgeDisplay(unreadMomentsCount);
 
     function syncUnreadTotals() {
         const totalUnread = chats.reduce((sum, c) => sum + (c.unread || 0), 0);
@@ -72,6 +78,7 @@ export function initWeChatApp() {
     }
 
     function persistMoments() {
+        moments.forEach(ensureMomentAuthor);
         updateState("phone.moments", moments);
     }
 
@@ -101,22 +108,147 @@ export function initWeChatApp() {
         return contact ? contact.id : null;
     }
 
+    function resolveContactNameById(id) {
+        if (!id) return null;
+        if (id === PLAYER_ID) return "你";
+        const contact = getContactsList().find(c => c.id === id);
+        return contact ? contact.name : null;
+    }
+
     function extractMentionedContactIds(text = "") {
         if (!text || !text.includes("@")) return [];
         const contacts = getContactsList();
-        const matched = new Set();
+        const matches = [];
         contacts.forEach(contact => {
-            const contactName = contact.name || "";
-            if (!contactName) return;
-            if (text.includes(`@${contactName}`)) {
-                matched.add(contact.id);
+            if (!contact?.name) return;
+            const pattern = `@${contact.name}`;
+            let searchIndex = 0;
+            while (searchIndex < text.length) {
+                const found = text.indexOf(pattern, searchIndex);
+                if (found === -1) break;
+                matches.push({ id: contact.id, name: contact.name, index: found });
+                searchIndex = found + pattern.length;
             }
         });
-        const normalized = text.toLowerCase();
-        if (/@你|@我/.test(text) || normalized.includes("@me") || normalized.includes("@self")) {
-            matched.add(PLAYER_ID);
+        PLAYER_ALIASES.forEach(alias => {
+            const pattern = `@${alias}`;
+            let searchIndex = 0;
+            while (searchIndex < text.length) {
+                const found = text.indexOf(pattern, searchIndex);
+                if (found === -1) break;
+                matches.push({ id: PLAYER_ID, name: alias, index: found });
+                searchIndex = found + pattern.length;
+            }
+        });
+        matches.sort((a, b) => a.index - b.index);
+        const ordered = [];
+        matches.forEach(match => {
+            if (!ordered.includes(match.id)) ordered.push(match.id);
+        });
+        return ordered;
+    }
+
+    function insertTextAtCursor(input, text) {
+        if (!input) return;
+        const start = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? input.value.length;
+        const before = input.value.slice(0, start);
+        const after = input.value.slice(end);
+        input.value = `${before}${text}${after}`;
+        const nextPos = start + text.length;
+        requestAnimationFrame(() => {
+            input.selectionStart = input.selectionEnd = nextPos;
+            input.focus();
+        });
+    }
+
+    function ensureMomentAuthor(moment) {
+        if (!moment) return null;
+        if (!moment.authorId) {
+            if (moment.who === "你") {
+                moment.authorId = PLAYER_ID;
+            } else {
+                moment.authorId = resolveContactIdByName(moment.who);
+            }
         }
-        return Array.from(matched);
+        return moment.authorId;
+    }
+
+    function getRandomContact(preferredId) {
+        const contacts = getMentionContacts();
+        if (!contacts.length) return null;
+        if (preferredId) {
+            const preferred = contacts.find(c => c.id === preferredId);
+            if (preferred) return preferred;
+        }
+        const pool = contacts.filter(c => c.id !== PLAYER_ID);
+        const list = pool.length ? pool : contacts;
+        return list[Math.floor(Math.random() * list.length)];
+    }
+
+    function pickMomentForEvent(momentId, requirePlayerAuthor = false) {
+        const pool = requirePlayerAuthor
+            ? moments.filter(m => ensureMomentAuthor(m) === PLAYER_ID)
+            : moments.slice();
+        if (!pool.length) return null;
+        if (momentId) {
+            const found = pool.find(m => m.id === momentId);
+            if (found) return found;
+        }
+        return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    function updateMomentsBadgeDisplay(count = unreadMomentsCount) {
+        if (!momentsTabButton) return;
+        momentsTabButton.classList.toggle("has-unread", count > 0);
+    }
+
+    function bumpMomentsUnread(delta = 1) {
+        const amount = Number.isFinite(delta) ? delta : 1;
+        unreadMomentsCount = Math.max(0, (unreadMomentsCount || 0) + amount);
+        updateMomentsBadgeDisplay();
+        incrementMomentsUnread(amount);
+    }
+
+    function markMomentsAsRead() {
+        if (!unreadMomentsCount) {
+            updateMomentsBadgeDisplay(0);
+            return;
+        }
+        unreadMomentsCount = 0;
+        updateMomentsBadgeDisplay(0);
+        clearMomentsUnread();
+    }
+
+    function handleMomentNotification(kind, detail = {}) {
+        const actorId = detail.actorId;
+        const targetAuthorId = detail.momentAuthorId;
+        if (kind === "mention") {
+            const mentionedIds = (detail.mentionedIds || []).filter(id => id && id !== actorId);
+            if (!mentionedIds.includes(PLAYER_ID)) return;
+        } else if (kind === "like") {
+            if (actorId === PLAYER_ID) return;
+            if (targetAuthorId !== PLAYER_ID) return;
+        } else {
+            if (actorId === PLAYER_ID) return;
+        }
+        bumpMomentsUnread(1);
+        triggerIslandNotify("朋友圈有新动态");
+        const label = kind === "mention"
+            ? "@ 提醒"
+            : kind === "like"
+                ? "朋友圈点赞"
+                : "朋友圈评论";
+        showPhoneFloatingAlert(label, { special: kind === "mention" });
+    }
+
+    function resolveCommentAuthorName(comment) {
+        if (!comment) return "访客";
+        if (comment.authorId === PLAYER_ID) return "你";
+        if (comment.authorId) {
+            return resolveContactNameById(comment.authorId) || comment.from || "访客";
+        }
+        return comment.from || "访客";
     }
 
     async function addMomentComment(moment, text, options = {}) {
@@ -141,9 +273,20 @@ export function initWeChatApp() {
         };
         moment.comments.push(entry);
         persistMoments();
-        const playerMentioned = mentions.includes(PLAYER_ID);
-        if (playerMentioned && authorId !== PLAYER_ID) {
-            showPhoneFloatingAlert("@ 提醒");
+        const momentAuthorId = ensureMomentAuthor(moment);
+        if (authorId !== PLAYER_ID) {
+            if (mentions.includes(PLAYER_ID)) {
+                handleMomentNotification("mention", {
+                    actorId: authorId,
+                    mentionedIds: mentions,
+                    momentAuthorId
+                });
+            } else {
+                handleMomentNotification("comment", {
+                    actorId: authorId,
+                    momentAuthorId
+                });
+            }
         }
         renderMoments();
         if (triggerEcho) {
@@ -274,6 +417,7 @@ export function initWeChatApp() {
         wrap.innerHTML = "";
         const mentionContacts = getMentionContacts();
         moments.forEach(m => {
+            ensureMomentAuthor(m);
             const div = document.createElement("div");
             div.className = "moment-card";
             div.innerHTML = `
@@ -290,9 +434,7 @@ export function initWeChatApp() {
                 </div>
             `;
             div.querySelector('[data-act="like"]').addEventListener("click", () => {
-                m.likedByUser = !m.likedByUser;
-                m.likes = Math.max(0, m.likes + (m.likedByUser ? 1 : -1));
-                renderMoments();
+                toggleOwnMomentLike(m);
             });
             const commentPanel = document.createElement("div");
             commentPanel.className = "moment-comment-panel";
@@ -316,10 +458,8 @@ export function initWeChatApp() {
                     btn.type = "button";
                     btn.textContent = contact.name;
                     btn.addEventListener("click", () => {
-                        if (commentInput.value && !commentInput.value.endsWith(" ")) {
-                            commentInput.value += " ";
-                        }
-                        commentInput.value += `@${contact.name} `;
+                        const snippet = `@${contact.name} `;
+                        insertTextAtCursor(commentInput, snippet);
                         mentionMenu.classList.remove("open");
                         mentionMenu.setAttribute("aria-hidden", "true");
                         commentInput.focus();
@@ -375,7 +515,14 @@ export function initWeChatApp() {
                 m.comments.forEach(c => {
                     const item = document.createElement("div");
                     item.className = "moment-comment";
-                    item.innerHTML = `<span>${c.type === "mention" ? "@你" : "你"}</span>${c.text}`;
+                    const authorSpan = document.createElement("span");
+                    authorSpan.className = "moment-comment-author";
+                    authorSpan.textContent = `${resolveCommentAuthorName(c)}：`;
+                    const textSpan = document.createElement("span");
+                    textSpan.className = "moment-comment-text";
+                    textSpan.textContent = c.text || "";
+                    item.appendChild(authorSpan);
+                    item.appendChild(textSpan);
                     commentsBlock.appendChild(item);
                 });
                 div.appendChild(commentsBlock);
@@ -389,6 +536,7 @@ export function initWeChatApp() {
         const entry = {
             id: `moment-${Date.now()}`,
             who: "你",
+            authorId: PLAYER_ID,
             text,
             time: "刚刚",
             likes: 0,
@@ -398,6 +546,26 @@ export function initWeChatApp() {
         moments.unshift(entry);
         persistMoments();
         renderMoments();
+    }
+
+    function toggleOwnMomentLike(moment) {
+        if (!moment) return;
+        const delta = moment.likedByUser ? -1 : 1;
+        moment.likedByUser = !moment.likedByUser;
+        moment.likes = Math.max(0, (moment.likes || 0) + delta);
+        persistMoments();
+        renderMoments();
+    }
+
+    function registerExternalMomentLike(moment, likerId) {
+        if (!moment) return;
+        moment.likes = Math.max(0, (moment.likes || 0) + 1);
+        persistMoments();
+        renderMoments();
+        handleMomentNotification("like", {
+            actorId: likerId,
+            momentAuthorId: ensureMomentAuthor(moment)
+        });
     }
 
     function renderWallet() {
@@ -438,6 +606,9 @@ export function initWeChatApp() {
             else if (target === "wallet") wechatTop.textContent = "钱包";
         }
         if (target === "chats") hideMessageBanner();
+        if (target === "moments") {
+            markMomentsAsRead();
+        }
     }
 
     tabs.forEach(btn => {
@@ -783,9 +954,16 @@ export function initWeChatApp() {
     }
     callTabs.forEach(btn => btn.addEventListener("click", () => switchCallTab(btn.dataset.ctab)));
     renderCallHistory();
-    subscribeState((path) => {
+    subscribeState((path, detail) => {
         if (path === "phone.calls") {
             renderCallHistory();
+        }
+        if (path === "moments:unread" || path === "state:unreadMomentsCount") {
+            const next = typeof detail?.count === "number"
+                ? detail.count
+                : (getState("unreadMomentsCount") || 0);
+            unreadMomentsCount = next;
+            updateMomentsBadgeDisplay(unreadMomentsCount);
         }
     });
     renderContactsList();
@@ -811,7 +989,10 @@ export function initWeChatApp() {
         addMomentComment,
         publishMoment,
         resolveContactIdByName,
-        extractMentionedContactIds
+        extractMentionedContactIds,
+        registerExternalMomentLike,
+        pickMomentForEvent: (momentId, requirePlayerAuthor) => pickMomentForEvent(momentId, requirePlayerAuthor),
+        getRandomContact: (preferredId) => getRandomContact(preferredId)
     };
 
     renderChats();
@@ -868,24 +1049,29 @@ export async function triggerWeChatNotification(reason = "剧情") {
     }
 }
 
-export async function triggerMomentsNotification() {
+export async function triggerMomentsNotification(detail = {}) {
     if (!weChatRuntime || !weChatRuntime.moments?.length) return;
-    const target = weChatRuntime.moments[Math.floor(Math.random() * weChatRuntime.moments.length)];
+    const type = detail.type || "comment";
+    const requirePlayerMoment = type === "like";
+    const target = weChatRuntime.pickMomentForEvent?.(detail.momentId, requirePlayerMoment);
     if (!target) return;
+    const contact = weChatRuntime.getRandomContact?.(detail.contactId) || { id: "npc", name: "未知信号" };
+    if (type === "like") {
+        if (contact.id === PLAYER_ID) return;
+        weChatRuntime.registerExternalMomentLike?.(target, contact.id);
+        return;
+    }
     try {
-        const aiComment = await askAI(`朋友圈中「${target.text}」，请生成一句神秘评论。`);
-        const text = aiComment || "……";
-        const mentionIds = weChatRuntime.extractMentionedContactIds?.(text) || [];
-        const mentionPlayer = mentionIds.includes(PLAYER_ID);
+        let text = detail.text || await askAI(`朋友圈中「${target.text}」，请写一句简短评论。`);
+        if (!text) text = "……";
+        if (type === "mention" && !text.includes("@")) {
+            text = `${text} @你`;
+        }
         await weChatRuntime.addMomentComment(target, text, {
-            type: text.includes("@") ? "mention" : "ai",
-            authorId: weChatRuntime.resolveContactIdByName?.(target.who) || "npc",
-            mentionedContactIds: mentionIds,
+            authorId: contact.id,
+            mentionedContactIds: detail.mentionedContactIds,
             triggerEcho: false
         });
-        if (!mentionPlayer) {
-            showPhoneFloatingAlert("朋友圈提醒");
-        }
     } catch (err) {
         console.error("朋友圈触发失败", err);
     }

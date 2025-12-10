@@ -118,6 +118,7 @@ function convertLegacyState(legacy) {
             total: legacy.phone?.unreadTotal || 0,
             byApp: legacy.phone?.unreadByApp || { wechat: 0, phone: 0 }
         },
+        unreadMomentsCount: legacy.unreadMomentsCount || 0,
         wallet: phone.wallet || { balance: 0, events: [] },
         blackFog: legacy.blackFog || { nodes: [] }
     };

@@ -965,6 +965,18 @@ body.mobile-mode #app {
     padding: 6px 8px;
     font-size: 12px;
     cursor: pointer;
+    position: relative;
+}
+.wechat-tabs button.has-unread::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #ff6a89;
+    box-shadow: 0 0 6px rgba(255,106,137,0.7);
 }
 .wechat-tabs button.active {
     background: rgba(244,182,196,0.18);
@@ -1228,11 +1240,16 @@ body.mobile-mode #app {
 .moment-comment {
     font-size: 11px;
     color: rgba(255,255,255,0.82);
+    display: flex;
+    gap: 4px;
 }
-.moment-comment span {
+.moment-comment-author {
     font-weight: 700;
     color: rgba(255,255,255,0.95);
-    margin-right: 4px;
+}
+.moment-comment-text {
+    flex: 1;
+    color: rgba(255,255,255,0.82);
 }
 
 /* 电话页 */

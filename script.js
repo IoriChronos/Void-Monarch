@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setTriggerHandlers({
         wechat: () => triggerWeChatNotification("剧情联动").catch(err => console.error(err)),
         call: () => triggerIncomingCall("元书 · 来电"),
-        moments: () => triggerMomentsNotification().catch(err => console.error(err)),
+        moments: (detail) => triggerMomentsNotification(detail || {}).catch(err => console.error(err)),
         notify: (label) => playSpecialFloatNotification(`${label} 提醒`)
     });
 

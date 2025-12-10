@@ -45,7 +45,9 @@ export function triggerRandomEvent(reason = "manual") {
     const options = [];
     if (handlerRefs.wechat) options.push("wechat");
     if (handlerRefs.call) options.push("call");
-    if (handlerRefs.moments) options.push("moments");
+    if (handlerRefs.moments) {
+        options.push("moment_comment", "moment_like", "moment_mention");
+    }
     if (!options.length) return;
     const pick = options[Math.floor(Math.random() * options.length)];
     if (pick === "wechat") {
@@ -56,9 +58,11 @@ export function triggerRandomEvent(reason = "manual") {
         handlerRefs.call?.();
         recordTrigger({ type: "call", reason });
         handlerRefs.notify?.("来电");
-    } else if (pick === "moments") {
-        handlerRefs.moments?.();
-        recordTrigger({ type: "moments", reason });
-        handlerRefs.notify?.("朋友圈");
+    } else if (pick.startsWith("moment_")) {
+        const detailType = pick.replace("moment_", "");
+        handlerRefs.moments?.({ type: detailType });
+        recordTrigger({ type: pick, reason });
+        const label = detailType === "like" ? "朋友圈点赞" : "朋友圈";
+        handlerRefs.notify?.(label);
     }
 }
