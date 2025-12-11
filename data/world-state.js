@@ -345,8 +345,8 @@ function segmentStoryPayload(rawText = "") {
             flush();
             return;
         }
-        const dialogueStart = /^#D\b/.test(trimmed);
-        if (dialogueStart && buffer.length) {
+        const markerStart = /^#[A-Z]+\b/.test(trimmed);
+        if (markerStart) {
             flush();
         }
         buffer.push(line);

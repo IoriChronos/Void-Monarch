@@ -117,25 +117,32 @@ export async function askAI(userInput = "") {
 
 export async function generateNarrativeReply(userInput) {
     // ====== 本地测试版：用于验证气泡、字体、换行、关键词效果 ======
-    const demoText = `
-#N 夜色像被撕开的布料缓缓垂落，深处浮着微光与残响。
+    const demos = {
+        fog: `
+#N 黑雾在脚边盘绕，像是沿着墙根呼吸。远处的霓虹被噪点吞进深渊。
+#A 他抬手，雾像两层幕布被掀开，露出更暗的空洞。
+#D 别退。我在等你呼吸配合我。
+        `.trim(),
+        tentacle: `
+#N 天花板滴下静电，影子里有触手卷出，细的一根绕住窗把，粗的一根拍在地上，蠕动着探向你。
+#A 有一根半透明的触手从屏幕上方探下来，轻轻扫过气泡文字，像在测温。
+#D 抬脚。你让它试试，还是让它绕上来？
+        `.trim(),
+        gaze: `
+#N 捕食者的目光像聚焦光圈，锁在你喉结。他的规则被念出：不许后退，不许眨眼。
+#S 他每说一句，空气就压出一圈金线波纹，像心跳一样扩散又收紧。
+#D 念出你的心率。
+        `.trim(),
+        chaos: `
+#N 一枚像素化的花体字母从气泡里掉出来，在空中抖动，落地变成碎光。
+#A 你碰到它，屏幕弹出小游戏：在十五秒内点击四个符印，否则雾会把文字吞掉。
+#N 同时，右上角有个符号闪烁，点一下会溅出一串金红碎片，再次点会出现一条细触手绕圈后消失。
+#D 玩还是不玩？——他的声音带笑意。期待效果：触发 glitch 闪烁 + 许可光晕 + 触手覆在文字上方。
+        `.trim()
+    };
 
-#A 他靠近一步，气息贴在你颈侧，像某种**不属于人类的耐心**正在等待。
-
-#T “你现在的心跳，很乱。”
-
-#D 靠过来一点。
-
-#N 空气被无形力量压弯，你听见什么在黑暗里——像是低声的呼唤，又像被逼近的捕食者。
-
-#S ——— 以下是关键词测试 ———
-
-#N 黑雾在脚边盘绕，像是在试探你会不会后退，霓虹与噪点顺着墙壁滑落。
-他的 **凝视** 划开影子，一缕 **靠近** 的气息落在肩上。
-强制般的 **控制** 正在收拢，不容抗拒的 **宣告** 沉在冷气里。
-
-#D 别动。我在记录你的脉搏。
-    `.trim();
+    const picked = pickDemo(userInput, demos);
+    const demoText = picked || demos.gaze;
 
     return {
         action: "reply_story",
@@ -146,6 +153,16 @@ export async function generateNarrativeReply(userInput) {
             meta: { parsed: false }  // ⬅ 强制触发 parser，而不是原样输出
         }
     };
+}
+
+function pickDemo(userInput, demos) {
+    const text = (userInput || "").toLowerCase();
+    if (text.includes("tentacle") || text.includes("触手")) return demos.tentacle;
+    if (text.includes("fog") || text.includes("雾")) return demos.fog;
+    if (text.includes("gaze") || text.includes("凝视")) return demos.gaze;
+    if (text.includes("chaos") || text.includes("彩蛋") || text.includes("小游戏")) return demos.chaos;
+    const list = Object.values(demos);
+    return list[Math.floor(Math.random() * list.length)];
 }
 
 export async function generatePhoneMessage(chatId) {

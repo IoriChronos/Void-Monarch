@@ -721,7 +721,12 @@ export function initWeChatApp() {
         const wrap = panels.chats;
         if (!wrap) return;
         wrap.innerHTML = "";
-        getAllChats().forEach(c => {
+        const chats = [...getAllChats()].sort((a, b) => {
+            if (a.pinned && !b.pinned) return -1;
+            if (b.pinned && !a.pinned) return 1;
+            return (b.time || 0) - (a.time || 0);
+        });
+        chats.forEach(c => {
             const div = document.createElement("div");
             div.className = "wc-item";
             if (c.pinned) div.classList.add("wc-item-pinned");

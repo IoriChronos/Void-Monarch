@@ -127,6 +127,7 @@ export function renderStoryBubble(entry, options = {}) {
                 node.insertBefore(icon, content);
             }
         }
+        decorateBubble(node);
     } else {
         node.className = `story-block block-${meta.type || "text"}${bareNarration ? " block-bare" : ""}`;
         if (meta.textLength > 120) {
@@ -359,12 +360,13 @@ function applyKeywordHighlighting(text = "") {
 }
 
 function applyInlineFormatting(html = "") {
-    return html
+    const formatted = html
         .replace(/\*\*(.+?)\*\*/gs, (_, inner) => `<span class="em-strong">${inner}</span>`)
         .replace(/_(.+?)_/gs, (_, inner) => `<span class="italic-soft">${inner}</span>`)
         .replace(/~~(.+?)~~/gs, (_, inner) => `<span class="strike-veil">${inner}</span>`)
         .replace(/`([^`]+)`/g, (_, inner) => `<code class="inline-code">${inner}</code>`)
         .replace(/“([^”]+)”/g, (_, inner) => `“<span class="quote-highlight">${inner}</span>”`);
+    return decorateLatinWords(formatted);
 }
 
 function buildKeywordRegex(rule) {
@@ -404,6 +406,68 @@ function applyParagraphStyles(text = "", classes = []) {
     });
 }
 
+function decorateBubble(node) {
+    if (!node || !node.classList?.contains("story-bubble")) return;
+    if (Math.random() > 0.82) {
+        node.classList.add("bubble-etched");
+    }
+    if (Math.random() > 0.88) {
+        const rune = document.createElement("span");
+        rune.className = "bubble-rune";
+        rune.style.setProperty("top", `${-14 + Math.random() * 10}px`);
+        rune.style.setProperty("right", `${-12 + Math.random() * 12}px`);
+        rune.addEventListener("click", () => {
+            rune.classList.remove("burst");
+            void rune.offsetWidth; // reset animation
+            rune.classList.add("burst");
+        });
+        node.appendChild(rune);
+    }
+    node.addEventListener("pointerenter", () => node.classList.add("bubble-hover"));
+    node.addEventListener("pointerleave", () => {
+        node.classList.remove("bubble-hover", "bubble-press");
+    });
+    let pressTimer = null;
+    node.addEventListener("pointerdown", () => {
+        pressTimer = setTimeout(() => {
+            node.classList.add("bubble-press");
+        }, 420);
+    });
+    const clearPress = () => {
+        if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
+        node.classList.remove("bubble-press");
+    };
+    node.addEventListener("pointerup", () => {
+        clearPress();
+        node.classList.add("bubble-clicked");
+        setTimeout(() => node.classList.remove("bubble-clicked"), 400);
+    });
+    node.addEventListener("pointercancel", clearPress);
+}
+
+function decorateLatinWords(html = "") {
+    return html.replace(/>([^<]+)</g, (match, text, offset) => {
+        const before = html.slice(0, offset);
+        const openCode = before.lastIndexOf("<code");
+        const closeCode = before.lastIndexOf("</code");
+        const insideCode = openCode > -1 && openCode > closeCode;
+        if (insideCode) return match;
+        const replaced = text.replace(/([A-Za-z]{3,})/g, (word) => {
+            const classes = ["latin-ink"];
+            if (/^[A-Z]{2,}$/.test(word)) {
+                classes.push("latin-upper");
+            } else if (/^[a-z]{5,}$/.test(word)) {
+                classes.push("latin-cursive");
+            }
+            return `<span class="${classes.join(" ")}">${word}</span>`;
+        });
+        return `>${replaced}<`;
+    });
+}
+
 function shouldRenderBareNarration(meta = {}) {
     if (!meta.cleanText) return false;
     const totalLines = meta.lineCount || meta.cleanText.split(/\n/).length;
@@ -433,9 +497,9 @@ function normalizeSpacingType(type) {
 
 const SPACING_MATRIX = {
     narration: {
-        narration: 6, // slightly wider than natural line spacing
+        narration: 4, // closer for continuous narration
         action: 3,
-        thought: 6,
+        thought: 5,
         dialogue: 3,
         system: 16,
         other: 3
@@ -443,7 +507,7 @@ const SPACING_MATRIX = {
     action: {
         action: 3,
         narration: 3,
-        thought: 7,
+        thought: 6,
         dialogue: 3,
         system: 16,
         other: 3
@@ -458,7 +522,7 @@ const SPACING_MATRIX = {
     }
 };
 
-const THOUGHT_MARGIN = 12;
+const THOUGHT_MARGIN = 10;
 
 function baseSpacing(prevType, currentType) {
     const normalizedPrev = normalizeSpacingType(prevType);

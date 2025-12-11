@@ -29,6 +29,21 @@ import { initAbyssBackground } from "./ui/abyss-bg.js";
 
 let storyUI = null;
 let storyBound = false;
+const abyssCooldown = {
+    fog: 0,
+    tentacle: 0,
+    wave: 0,
+    gaze: 0
+};
+const ABYSS_MIN_INTERVAL = {
+    fog: 4500,
+    tentacle: 7200,
+    wave: 5200,
+    gaze: 5200
+};
+let abyssBubbleCount = 0;
+let lastAmbientAt = -3;
+let abyssSilence = 0;
 
 document.addEventListener("DOMContentLoaded", () => {
     const safe = (label, fn) => {
@@ -110,6 +125,7 @@ function bindStoryStream() {
                 detail.message.snapshotId = snapshotId;
                 storyUI?.setBubbleSnapshot?.(bubble, snapshotId);
             }
+            stirAbyss(detail.message);
         } else if (path === "story:update" && detail?.message) {
             storyUI?.updateBubble?.(detail.message);
         }
@@ -258,4 +274,114 @@ function refreshAbyssBackground() {
     if (engine && typeof engine.refresh === "function") {
         engine.refresh();
     }
+}
+
+function stirAbyss(entry) {
+    if (!entry?.text) return;
+    if (entry.role && entry.role !== "system") return;
+    const engine = document.getElementById("story-panel")?.__abyssBg;
+    if (!engine) return;
+    if (isDialogueOnly(entry)) return;
+    if (abyssSilence > 0) {
+        abyssSilence = Math.max(0, abyssSilence - 1);
+        return;
+    }
+
+    const text = entry.text || "";
+    const denseLen = text.replace(/\s+/g, "").length;
+    const now = Date.now();
+    abyssBubbleCount += 1;
+    let used = 0;
+    const tryUse = (fn) => {
+        if (used >= 2 || !fn) return;
+        used += 1;
+        fn();
+    };
+
+    const ambientKeywords = /(夜里|深夜|灯光|雨|下雨|窗外|天色|房间里|安静|沉默|空气|阴冷|发凉)/;
+    const presenceKeywords = /(靠近|贴近|站在你身后|低头|俯身|伸手|扣住|按住|不许|别动|听话)/;
+    const gazeKeywords = /(看着你|盯着你|目光|记录|确认|规则|记住)/;
+    const psycheKeywords = /(呼吸变慢|喉咙发紧|意识到|察觉|没法拒绝|无法反驳|被迫|不由自主)/;
+    const disorientKeywords = /(忽然|突然|不对劲|像是|仿佛|时间停了一下)/;
+    const worldJumpAncient = /(古代|宫殿|烛火|甲胄)/;
+    const worldJumpBackrooms = /(后室|回廊|空房间|黄光)/;
+    const worldJumpCultivation = /(修仙|灵气|阵法|山门)/;
+    const tentacleKeywords = /(触手|缠绕|卷住|伸出|蠕)/;
+    const eggKeywords = /(彩蛋|小游戏|符印|点击|小机关)/;
+
+    const triggerAmbient = (ambientKeywords.test(text) || denseLen >= 45) && (abyssBubbleCount - lastAmbientAt >= 3);
+
+    // Anomaly tier
+    const jumpHit = worldJumpAncient.test(text) || worldJumpBackrooms.test(text) || worldJumpCultivation.test(text);
+    if (jumpHit) {
+        tryUse(() => {
+            engine.fog?.("shift", 1.1 + Math.random() * 0.4);
+            engine.spaceWarp?.();
+        });
+        markAwaken("fog", now);
+        abyssSilence = 3;
+        lastAmbientAt = abyssBubbleCount;
+        return;
+    }
+    if (disorientKeywords.test(text)) {
+        tryUse(() => engine.glitchFlash?.());
+        if (Math.random() > 0.5) {
+            tryUse(() => engine.dimSurround?.(0.25 + Math.random() * 0.2));
+        }
+    }
+
+    // Presence / Control
+    if (presenceKeywords.test(text)) {
+        if (canAwaken("gaze", now)) {
+            tryUse(() => {
+                engine.predatorGaze?.((-4 + Math.random() * 8).toFixed(1));
+                markAwaken("gaze", now);
+            });
+        }
+    } else if (gazeKeywords.test(text) && canAwaken("gaze", now)) {
+        tryUse(() => {
+            engine.predatorGaze?.((-6 + Math.random() * 12).toFixed(1));
+            markAwaken("gaze", now);
+        });
+    }
+
+    if (psycheKeywords.test(text)) {
+        tryUse(() => engine.dimSurround?.(0.35 + Math.random() * 0.25));
+    }
+
+    if (tentacleKeywords.test(text) && canAwaken("tentacle", now)) {
+        const count = Math.random() > 0.5 ? 2 : 1;
+        const speed = 0.8 + Math.random() * 0.6;
+        const thickness = 0.8 + Math.random() * 0.9;
+        tryUse(() => engine.summonTentacle?.({ count, speed, thickness }));
+        markAwaken("tentacle", now);
+    }
+
+    if (eggKeywords.test(text)) {
+        tryUse(() => engine.glitchFlash?.());
+        tryUse(() => engine.showSigil?.());
+    }
+
+    // Ambient (last)
+    if (triggerAmbient && canAwaken("fog", now)) {
+        const power = 0.8 + Math.random() * 0.5;
+        tryUse(() => engine.fog?.("soft", power));
+        lastAmbientAt = abyssBubbleCount;
+        markAwaken("fog", now);
+    }
+}
+
+function canAwaken(key, now) {
+    const last = abyssCooldown[key] || 0;
+    return now - last > (ABYSS_MIN_INTERVAL[key] || 4000);
+}
+
+function markAwaken(key, now) {
+    abyssCooldown[key] = now;
+}
+
+function isDialogueOnly(entry) {
+    if (entry?.meta?.storyType === "dialogue") return true;
+    const text = entry?.text || "";
+    return /^#?D\b/m.test(text);
 }
