@@ -16,9 +16,13 @@ import {
     deleteMoment,
     likeMoment as worldLikeMoment,
     commentMoment as worldCommentMoment,
+    appendSystemMessage,
     sendTransfer as walletSendTransfer,
     sendRedPacket as walletSendRedPacket,
-    openRedPacket as walletOpenRedPacket
+    openRedPacket as walletOpenRedPacket,
+    blockChat,
+    setChatPinned,
+    addMemoEntry as logMemoEntry
 } from "../data/world-state.js";
 import { addShortEventMemory } from "../data/memory-short.js";
 import { addEventLog } from "../data/events-log.js";
@@ -37,6 +41,9 @@ export function initWeChatApp() {
     const chatWindow = document.getElementById("wechat-chat-window");
     const chatHeadControls = document.getElementById("chat-head-controls");
     const chatRecallBtn = document.getElementById("chat-recall-btn");
+    const contactsAddBtn = document.getElementById("contacts-add-btn");
+    const chatTitle = document.getElementById("chat-title");
+    const chatStatusText = document.getElementById("chat-status-text");
     const chatLog = document.getElementById("wechat-chat-log");
     const chatInput = document.getElementById("wechat-chat-input");
     const chatSend = document.getElementById("wechat-chat-send");
@@ -63,7 +70,6 @@ export function initWeChatApp() {
     const messageBannerTitle = document.getElementById("message-banner-title");
     const messageBannerText = document.getElementById("message-banner-text");
     const momentsTabButton = document.querySelector('[data-wtab="moments"]');
-    const chats = getState("phone.chats") || [];
     const moments = getState("phone.moments") || [];
     const wallet = getState("phone.wallet") || { balance: 0 };
     let walletBalance = wallet.balance ?? 0;
@@ -79,11 +85,33 @@ export function initWeChatApp() {
     let messageBannerTarget = null;
     let unreadMomentsCount = getState("unreadMomentsCount") || 0;
     updateMomentsBadgeDisplay(unreadMomentsCount);
+    const momentNotifications = [];
+    let pendingMomentDelete = null;
+
+    const chatMenuBtn = document.getElementById("chat-menu-btn");
+    const chatHeadMenu = document.getElementById("chat-head-menu");
+    const chatContextMenu = document.getElementById("chat-context-menu");
+    const addFriendButton = document.getElementById("contacts-add-btn");
+    const addFriendModal = document.getElementById("add-friend-modal");
+    const addFriendInput = document.getElementById("add-friend-input");
+    const addFriendConfirm = document.getElementById("add-friend-confirm");
+    const addFriendCancel = document.getElementById("add-friend-cancel");
+    const momentDeleteModal = document.getElementById("moment-delete-modal");
+    const momentDeleteConfirm = document.getElementById("moment-delete-confirm");
+    const momentDeleteCancel = document.getElementById("moment-delete-cancel");
+    const momentsNoticeRail = document.getElementById("moments-notice-rail");
+    const momentsNoticePanel = document.getElementById("moments-notice-panel");
+    const momentsNoticeClose = document.getElementById("moments-notice-close");
+    const momentsNoticeList = document.getElementById("moments-notice-list");
 
 
+
+    function getAllChats() {
+        return getState("phone.chats") || [];
+    }
 
     function syncUnreadTotals() {
-        const totalUnread = chats.reduce((sum, c) => sum + (c.unread || 0), 0);
+        const totalUnread = getAllChats().reduce((sum, c) => sum + (c.unread || 0), 0);
         const unreadByApp = { ...(getState("phone.unreadByApp") || {}) };
         unreadByApp.wechat = totalUnread;
         updateState("phone.unreadByApp", unreadByApp);
@@ -214,6 +242,189 @@ export function initWeChatApp() {
         momentsTabButton.classList.toggle("has-unread", count > 0);
     }
 
+    function getActiveChat() {
+        const activeId = chatWindow?.dataset?.chat;
+        if (!activeId) return null;
+        const chatList = getAllChats();
+        return chatList.find(c => c.id === activeId) || null;
+    }
+
+    function updateChatInputState(chat) {
+        const blocked = Boolean(chat?.blocked);
+        if (chatInput) chatInput.disabled = blocked;
+        if (chatSend) chatSend.disabled = blocked;
+        if (chatActionsToggle) chatActionsToggle.disabled = blocked;
+    }
+
+    function toggleAddFriendButton(show) {
+        if (!contactsAddBtn) return;
+        contactsAddBtn.style.display = show ? "inline-flex" : "none";
+    }
+
+    function toggleMainHeader(show, text) {
+        if (wechatTop) {
+            wechatTop.style.visibility = show ? "visible" : "hidden";
+            if (typeof text === "string") wechatTop.textContent = text;
+        }
+        if (contactsAddBtn) {
+            contactsAddBtn.style.display = show ? "inline-flex" : "none";
+        }
+    }
+
+    function updateChatActionControls(chat) {
+        updateChatRecallControl(chat);
+        const statusParts = [];
+        if (chat?.pinned) {
+            statusParts.push("置顶");
+        }
+        if (chat?.blocked) {
+            statusParts.push("已拉黑");
+        }
+        if (chatTitle) {
+            chatTitle.textContent = chat?.name || "";
+        }
+        if (chatStatusText) {
+            chatStatusText.textContent = statusParts.join(" · ");
+            chatStatusText.style.opacity = statusParts.length ? "0.8" : "0";
+        }
+        updateChatInputState(chat);
+        toggleAddFriendButton(!chatWindow || chatWindow.style.display === "none");
+    }
+
+    let contextTarget = null;
+    let longPressTimer = null;
+    let contextTimer = null;
+
+    function showChatContextMenuAt(row, x, y) {
+        if (!chatContextMenu || !row) return;
+        const chatId = row.dataset.chatId;
+        if (!chatId) return;
+        contextTarget = chatId;
+        if (contextTimer) {
+            clearTimeout(contextTimer);
+            contextTimer = null;
+        }
+        const menuRect = chatContextMenu.getBoundingClientRect();
+        const posX = Math.min(x, window.innerWidth - menuRect.width - 12);
+        const posY = Math.min(y, window.innerHeight - menuRect.height - 12);
+        chatContextMenu.style.left = `${posX}px`;
+        chatContextMenu.style.top = `${posY}px`;
+        chatContextMenu.classList.add("show");
+        chatContextMenu.dataset.chatId = chatId;
+    }
+
+    function closeChatContextMenu() {
+        if (!chatContextMenu) return;
+        chatContextMenu.classList.remove("show");
+        chatContextMenu.removeAttribute("data-chat-id");
+        contextTarget = null;
+    }
+
+    function handleContextRecall() {
+        const chatId = chatContextMenu?.dataset?.chatId;
+        if (!chatId) return;
+        withdrawChatMessage(chatId);
+        renderChats();
+        openChat(chatId);
+        showMessageBanner("微信", "你撤回了一条消息。");
+        closeChatContextMenu();
+    }
+
+    function handleChatMenuAction(action) {
+        const chat = getActiveChat();
+        if (!chat) return;
+        if (action === "pin") {
+            const next = !chat.pinned;
+            setChatPinned(chat.id, next);
+            showPhoneFloatingAlert("微信", next ? "已置顶" : "取消置顶");
+        } else if (action === "block") {
+            const next = !chat.blocked;
+            blockChat(chat.id, next);
+            appendSystemMessage(chat.id, next ? "你已将对方拉黑。" : "你已解除拉黑。", { kind: "tip" });
+            showPhoneFloatingAlert("微信", next ? "已拉黑" : "已解除拉黑");
+        }
+        renderChats();
+        const updated = getActiveChat();
+        updateChatActionControls(updated);
+        chatHeadMenu?.classList.remove("show");
+    }
+
+    function openAddFriendModal() {
+        if (!addFriendModal) return;
+        if (addFriendInput) addFriendInput.value = "";
+        addFriendModal.classList.add("show");
+        addFriendModal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeAddFriendModal() {
+        if (!addFriendModal) return;
+        addFriendModal.classList.remove("show");
+        addFriendModal.setAttribute("aria-hidden", "true");
+    }
+
+    function submitAddFriend() {
+        if (!addFriendInput) return closeAddFriendModal();
+        const raw = addFriendInput.value.trim();
+        if (!raw) {
+            showPhoneFloatingAlert("微信", "请输入名称");
+            return;
+        }
+        const contacts = getContactsList();
+        if (contacts.find(c => c.name === raw)) {
+            showPhoneFloatingAlert("微信", "该好友已存在");
+            closeAddFriendModal();
+            return;
+        }
+        const chatsList = getAllChats();
+        const newId = raw.toLowerCase().replace(/[^a-z0-9]+/g, "-") || `friend-${Date.now()}`;
+        const newContact = {
+            id: newId,
+            name: raw,
+            tel: "未知线路",
+            icon: raw[0] || "✦"
+        };
+        const newChat = {
+            id: newId,
+            name: raw,
+            icon: newContact.icon,
+            time: "刚刚",
+            unread: 0,
+            log: [],
+            preview: "",
+            pinned: false,
+            blocked: false,
+            orderIndex: chatsList.length
+        };
+        updateState("contacts", [...contacts, newContact]);
+        updateState("phone.chats", [...chatsList, newChat]);
+        renderChats();
+        closeAddFriendModal();
+        logMemoEntry(`添加好友：${raw}`);
+        showPhoneFloatingAlert("微信", "好友请求已发送");
+    }
+
+    function openMomentDeleteModal(moment) {
+        if (!momentDeleteModal || !moment) return;
+        pendingMomentDelete = moment;
+        momentDeleteModal.classList.add("show");
+        momentDeleteModal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeMomentDeleteModal() {
+        if (!momentDeleteModal) return;
+        pendingMomentDelete = null;
+        momentDeleteModal.classList.remove("show");
+        momentDeleteModal.setAttribute("aria-hidden", "true");
+    }
+
+    function confirmMomentDelete() {
+        if (!pendingMomentDelete) return;
+        deleteMoment(pendingMomentDelete.id);
+        renderMoments();
+        closeMomentDeleteModal();
+        showPhoneFloatingAlert("朋友圈", "已删除该动态");
+    }
+
     function bumpMomentsUnread(delta = 1) {
         const amount = Number.isFinite(delta) ? delta : 1;
         unreadMomentsCount = Math.max(0, (unreadMomentsCount || 0) + amount);
@@ -251,6 +462,80 @@ export function initWeChatApp() {
                 ? "朋友圈点赞"
                 : "朋友圈评论";
         showPhoneFloatingAlert(label, { special: kind === "mention" });
+        queueMomentNotification(kind, detail);
+    }
+
+    function queueMomentNotification(kind, detail = {}) {
+        const label = kind === "mention"
+            ? "@ 提醒"
+            : kind === "like"
+                ? "朋友圈点赞"
+                : "朋友圈评论";
+        const entry = {
+            id: `notice-${kind}-${Date.now()}`,
+            kind,
+            label,
+            momentId: detail.momentId,
+            text: detail.snippet || detail.momentText || label,
+            time: detail.time || Date.now()
+        };
+        momentNotifications.unshift(entry);
+        if (momentNotifications.length > 12) {
+            momentNotifications.pop();
+        }
+        renderMomentNoticeRail();
+    }
+
+    function renderMomentNoticeRail() {
+        if (!momentsNoticeRail) return;
+        const has = momentNotifications.length > 0;
+        momentsNoticeRail.style.display = has ? "block" : "none";
+    }
+
+    function openMomentNoticePanel() {
+        if (!momentsNoticePanel) return;
+        renderMomentNoticeList();
+        momentsNoticePanel.classList.add("show");
+        momentsNoticePanel.setAttribute("aria-hidden", "false");
+    }
+
+    function closeMomentNoticePanel() {
+        if (!momentsNoticePanel) return;
+        momentsNoticePanel.classList.remove("show");
+        momentsNoticePanel.setAttribute("aria-hidden", "true");
+    }
+
+    function renderMomentNoticeList() {
+        if (!momentsNoticeList) return;
+        momentsNoticeList.innerHTML = "";
+        momentNotifications.forEach(entry => {
+            const item = document.createElement("div");
+            item.className = "moments-notice-item";
+            item.innerHTML = `
+                <strong>${entry.label}</strong>
+                <p>${entry.text}</p>
+                <small>${new Date(entry.time).toLocaleTimeString()}</small>
+            `;
+            item.addEventListener("click", () => {
+                closeMomentNoticePanel();
+                if (entry.momentId) {
+                    openMomentById(entry.momentId);
+                }
+            });
+            momentsNoticeList.appendChild(item);
+        });
+    }
+
+    function openMomentById(momentId) {
+        if (!momentId) return;
+        switchTab("moments");
+        renderMoments();
+        requestAnimationFrame(() => {
+            const card = document.querySelector(`[data-moment-card="${momentId}"]`);
+            if (card) {
+                card.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        });
     }
 
     function resolveCommentAuthorName(comment) {
@@ -281,12 +566,16 @@ export function initWeChatApp() {
                 handleMomentNotification("mention", {
                     actorId: authorId,
                     mentionedIds: mentions,
-                    momentAuthorId
+                    momentAuthorId,
+                    momentId: moment.id,
+                    snippet: text
                 });
             } else {
                 handleMomentNotification("comment", {
                     actorId: authorId,
-                    momentAuthorId
+                    momentAuthorId,
+                    momentId: moment.id,
+                    snippet: text
                 });
             }
         }
@@ -373,18 +662,24 @@ export function initWeChatApp() {
     ];
 
     function totalUnreadCount() {
-        return chats.reduce((sum, c) => sum + (c.unread || 0), 0);
+        return getAllChats().reduce((sum, c) => sum + (c.unread || 0), 0);
     }
 
     function renderChats() {
         const wrap = panels.chats;
         if (!wrap) return;
         wrap.innerHTML = "";
-        chats.forEach(c => {
+        getAllChats().forEach(c => {
             const div = document.createElement("div");
             div.className = "wc-item";
+            if (c.pinned) div.classList.add("wc-item-pinned");
+            if (c.blocked) div.classList.add("wc-item-blocked");
+            const statusBadges = [];
+            if (c.pinned) statusBadges.push('<span class="wc-pin">置顶</span>');
+            if (c.blocked) statusBadges.push('<span class="wc-blocked">拉黑</span>');
             const meta = `
                 <div class="wc-meta">
+                    ${statusBadges.join("")}
                     ${c.unread ? `<span class="wc-unread">${c.unread}</span>` : ""}
                     <span class="wc-time">${c.time}</span>
                 </div>
@@ -432,6 +727,8 @@ export function initWeChatApp() {
             ensureMomentAuthor(m);
             const div = document.createElement("div");
             div.className = "moment-card";
+            div.dataset.momentCard = m.id;
+            div.dataset.momentAuthor = m.authorId;
             div.innerHTML = `
                 <div class="wc-name">${m.who}</div>
                 <div class="wc-sub">${m.text}</div>
@@ -525,14 +822,11 @@ export function initWeChatApp() {
             if (m.authorId === PLAYER_ID && actionsEl) {
                 const deleteBtn = document.createElement("button");
                 deleteBtn.type = "button";
-                deleteBtn.className = "delete";
+                deleteBtn.className = "moment-delete-btn";
                 deleteBtn.textContent = "删除";
-                deleteBtn.addEventListener("click", () => {
-                    const confirmed = window.confirm("确认删除这条朋友圈？");
-                    if (!confirmed) return;
-                    deleteMoment(m.id);
-                    renderMoments();
-                    showPhoneFloatingAlert("朋友圈", "删除了一条动态");
+                deleteBtn.addEventListener("click", (event) => {
+                    event.stopPropagation();
+                    openMomentDeleteModal(m);
                 });
                 actionsEl.appendChild(deleteBtn);
             }
@@ -576,7 +870,9 @@ export function initWeChatApp() {
         renderMoments();
         handleMomentNotification("like", {
             actorId: likerId,
-            momentAuthorId: ensureMomentAuthor(moment)
+            momentAuthorId: ensureMomentAuthor(moment),
+            momentId: moment.id,
+            snippet: moment.text
         });
     }
 
@@ -609,13 +905,17 @@ export function initWeChatApp() {
         if (chatWindow) chatWindow.style.display = "none";
         if (wechatBottom) wechatBottom.style.display = "grid";
         if (chatHeadControls) chatHeadControls.style.display = "none";
+        toggleAddFriendButton(target === "chats");
+        toggleMainHeader(target === "chats", target === "chats" ? `Wechat (${totalUnreadCount()})` : wechatTop?.textContent);
         setChatActions(false);
         hideRedEnvelopeOverlay();
         const unread = totalUnreadCount();
-        if (wechatTop) {
-            if (target === "chats") wechatTop.textContent = `Wechat (${unread})`;
-            else if (target === "moments") wechatTop.textContent = "朋友圈";
-            else if (target === "wallet") wechatTop.textContent = "钱包";
+        if (target === "chats") {
+            toggleMainHeader(true, `Wechat (${unread})`);
+        } else if (target === "moments") {
+            toggleMainHeader(true, "朋友圈");
+        } else if (target === "wallet") {
+            toggleMainHeader(true, "钱包");
         }
         if (target === "chats") hideMessageBanner();
         if (target === "moments") {
@@ -630,7 +930,7 @@ export function initWeChatApp() {
     });
 
     function openChat(id) {
-        const c = chats.find(x => x.id === id);
+        const c = getAllChats().find(x => x.id === id);
         if (!c || !chatWindow || !chatLog) return;
         worldMarkChatRead(id);
         persistChats();
@@ -641,17 +941,24 @@ export function initWeChatApp() {
         hideRedEnvelopeOverlay();
         hideMessageBanner();
         chatLog.innerHTML = "";
-        c.log.forEach(m => {
+        c.log.forEach((m, idx) => {
             const b = document.createElement("div");
-            const kind = m.kind ? ` ${m.kind}` : "";
-            b.className = "chat-bubble " + (m.from === "in" ? "in" : "out") + kind;
+            const kindClass = m.kind ? ` ${m.kind}` : "";
+            const isTip = m.from === "system" || m.kind === "notice" || m.kind === "tip";
+            b.className = (isTip ? "chat-tip-bubble" : "chat-bubble " + (m.from === "in" ? "in" : "out") + kindClass);
             b.textContent = formatChatText(m);
+            if (m.recalled) b.classList.add("chat-recalled");
             const row = document.createElement("div");
-            row.className = "chat-row " + (m.from === "in" ? "in" : "out");
-            const avatar = document.createElement("div");
-            avatar.className = "chat-avatar";
-            avatar.textContent = m.from === "in" ? "◻" : "▣";
-            row.appendChild(avatar);
+            row.className = "chat-row " + (isTip ? "system-tip" : (m.from === "system" ? "system" : (m.from === "in" ? "in" : "out")));
+            row.dataset.chatId = c.id;
+            row.dataset.msgIndex = idx;
+            row.dataset.from = m.from;
+            if (!isTip && m.from !== "system") {
+                const avatar = document.createElement("div");
+                avatar.className = "chat-avatar";
+                avatar.textContent = m.from === "in" ? "◻" : "▣";
+                row.appendChild(avatar);
+            }
             row.appendChild(b);
             if (m.kind === "red" && m.from === "in") {
                 b.classList.add("red-bubble-in");
@@ -666,10 +973,13 @@ export function initWeChatApp() {
         chatWindow.dataset.chat = id;
         chatWindow.style.display = "flex";
         if (wechatBottom) wechatBottom.style.display = "none";
-        if (wechatTop) wechatTop.textContent = c.name;
+        toggleMainHeader(false);
+        // keep the top title showing total/unread when list is visible; chat title lives inside header
+        if (chatTitle) chatTitle.textContent = c.name;
         if (chatHeadControls) chatHeadControls.style.display = "flex";
-        updateChatRecallControl(c);
         renderChats();
+        updateChatActionControls(c);
+        toggleAddFriendButton(false);
     }
 
     function setChatActions(open) {
@@ -756,6 +1066,11 @@ export function initWeChatApp() {
 
     function handleIncomingMessage(chat, msg) {
         if (!chat) return;
+        if (chat.blocked) {
+            appendSystemMessage(chat.id, "你已屏蔽该联系人，消息不会出现在对话中。");
+            renderChats();
+            return;
+        }
         const payload = {
             kind: msg.kind,
             amount: msg.amount,
@@ -778,7 +1093,7 @@ export function initWeChatApp() {
     async function sendChat(textOverride, kindOverride, meta = {}) {
         if (!chatWindow || !chatInput) return;
         const id = chatWindow.dataset.chat;
-        const c = chats.find(x => x.id === id);
+        const c = getAllChats().find(x => x.id === id);
         if (!c) return;
         const text = (textOverride != null ? textOverride : chatInput.value.trim());
         if (!text) return;
@@ -812,6 +1127,33 @@ export function initWeChatApp() {
             sendChat().catch(err => console.error(err));
         }
     });
+    if (chatLog) {
+        let activeRow = null;
+        const handlePointerDown = (event) => {
+            const row = event.target.closest(".chat-row");
+            if (!row || row.dataset.from !== "out") return;
+            activeRow = row;
+            contextTimer = window.setTimeout(() => {
+                showChatContextMenuAt(row, event.clientX, event.clientY);
+            }, 520);
+        };
+        const clearPointerTimer = () => {
+            if (contextTimer) {
+                clearTimeout(contextTimer);
+                contextTimer = null;
+            }
+            activeRow = null;
+        };
+        chatLog.addEventListener("contextmenu", event => {
+            const row = event.target.closest(".chat-row");
+            if (!row || row.dataset.from !== "out") return;
+            event.preventDefault();
+            showChatContextMenuAt(row, event.clientX, event.clientY);
+        });
+        chatLog.addEventListener("pointerdown", handlePointerDown);
+        chatLog.addEventListener("pointerup", clearPointerTimer);
+        chatLog.addEventListener("pointerleave", clearPointerTimer);
+    }
     if (chatActionsToggle) {
         chatActionsToggle.addEventListener("click", () => {
             setChatActions();
@@ -854,6 +1196,58 @@ export function initWeChatApp() {
             setChatActions(false);
         });
     }
+    if (chatContextMenu) {
+        chatContextMenu.addEventListener("click", (event) => {
+            const target = event.target.closest("[data-context-action]");
+            if (!target) return;
+            const action = target.dataset.contextAction;
+            if (action === "recall") {
+                handleContextRecall();
+            }
+        });
+    }
+    window.addEventListener("click", (event) => {
+        if (chatContextMenu && chatContextMenu.contains(event.target)) return;
+        if (chatMenuBtn && chatMenuBtn.contains(event.target)) return;
+        closeChatContextMenu();
+        chatHeadMenu?.classList.remove("show");
+    });
+    if (chatMenuBtn) {
+        chatMenuBtn.addEventListener("click", (event) => {
+            event.stopPropagation();
+            chatHeadMenu?.classList.toggle("show");
+        });
+    }
+    if (chatHeadMenu) {
+        chatHeadMenu.addEventListener("click", (event) => {
+            const action = event.target.closest("[data-chat-menu]")?.dataset?.chatMenu;
+            if (!action) return;
+            handleChatMenuAction(action);
+        });
+    }
+    if (momentsNoticeRail) {
+        momentsNoticeRail.addEventListener("click", () => {
+            openMomentNoticePanel();
+        });
+    }
+    if (momentsNoticeClose) {
+        momentsNoticeClose.addEventListener("click", closeMomentNoticePanel);
+    }
+    if (addFriendButton) {
+        addFriendButton.addEventListener("click", openAddFriendModal);
+    }
+    if (addFriendConfirm) {
+        addFriendConfirm.addEventListener("click", submitAddFriend);
+    }
+    if (addFriendCancel) {
+        addFriendCancel.addEventListener("click", closeAddFriendModal);
+    }
+    if (momentDeleteConfirm) {
+        momentDeleteConfirm.addEventListener("click", confirmMomentDelete);
+    }
+    if (momentDeleteCancel) {
+        momentDeleteCancel.addEventListener("click", closeMomentDeleteModal);
+    }
     if (redEnvelopeConfirm) {
         redEnvelopeConfirm.addEventListener("click", () => {
             if (pendingRedEnvelope && pendingRedEnvelope.message) {
@@ -886,11 +1280,14 @@ export function initWeChatApp() {
         if (chatWindow) chatWindow.style.display = "none";
         switchTab("chats");
         hideRedEnvelopeOverlay();
-        const top = document.getElementById("wechat-top");
-        if (top) top.textContent = `Wechat (${totalUnreadCount()})`;
+        toggleMainHeader(true, `Wechat (${totalUnreadCount()})`);
         hideMessageBanner();
         if (chatRecallBtn) chatRecallBtn.style.display = "none";
+        updateChatActionControls(null);
+        toggleAddFriendButton(true);
     });
+
+    // chatAddBtn removed by design; add-friend handled via contacts header
 
     if (chatRecallBtn) {
         chatRecallBtn.addEventListener("click", () => {
@@ -1000,6 +1397,11 @@ export function initWeChatApp() {
                     openChat(detail.chatId);
                 }
                 break;
+            case "chats:pinned":
+            case "chats:block":
+                renderChats();
+                updateChatActionControls(getActiveChat());
+                break;
             case "moments:post":
             case "moments:comment":
             case "moments:like":
@@ -1024,7 +1426,9 @@ export function initWeChatApp() {
     }
 
     weChatRuntime = {
-        chats,
+        get chats() {
+            return getAllChats();
+        },
         moments,
         handleIncomingMessage,
         renderChats,
@@ -1043,14 +1447,19 @@ export function initWeChatApp() {
     renderChats();
     renderMoments();
     renderWallet();
+    renderMomentNoticeRail();
     switchTab("chats");
+    const initialChats = getAllChats();
+    if (!chatWindow?.dataset?.chat && initialChats.length) {
+        openChat(initialChats[0].id);
+    }
 
     updateWalletDisplay();
 
     // 黑雾点击：注入消息+转账，触发岛通知
     document.querySelectorAll('.app-icon[data-target="darkfog-page"]').forEach(icon => {
         icon.addEventListener('click', () => {
-            const targetChat = chats.find(x => x.id === "yuan");
+        const targetChat = getAllChats().find(x => x.id === "yuan");
             if (targetChat) {
                 const wasActive = isChatActive(targetChat.id);
                 sendWeChatMessage(targetChat.id, "黑雾覆盖：他在看你。", "in");
