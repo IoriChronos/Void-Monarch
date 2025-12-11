@@ -433,30 +433,32 @@ function normalizeSpacingType(type) {
 
 const SPACING_MATRIX = {
     narration: {
-        narration: 12,
-        action: 6,
-        thought: 8,
-        dialogue: 7,
+        narration: 6, // slightly wider than natural line spacing
+        action: 3,
+        thought: 6,
+        dialogue: 3,
         system: 16,
-        other: 7
+        other: 3
     },
     action: {
-        action: 5,
-        narration: 7,
-        thought: 9,
-        dialogue: 6,
+        action: 3,
+        narration: 3,
+        thought: 7,
+        dialogue: 3,
         system: 16,
-        other: 6
+        other: 3
     },
     dialogue: {
-        dialogue: 5,
-        action: 7,
-        narration: 7,
-        thought: 8,
+        dialogue: 3,
+        action: 3,
+        narration: 3,
+        thought: 5,
         system: 16,
-        other: 6
+        other: 3
     }
 };
+
+const THOUGHT_MARGIN = 12;
 
 function baseSpacing(prevType, currentType) {
     const normalizedPrev = normalizeSpacingType(prevType);
@@ -464,11 +466,8 @@ function baseSpacing(prevType, currentType) {
     if (normalizedPrev === "system" || normalizedCurrent === "system") return 16;
     if (!normalizedPrev) {
         const fallback = SPACING_MATRIX.narration;
-        if (normalizedCurrent === "thought") return 26;
         return fallback[normalizedCurrent] ?? fallback.other;
     }
-    if (normalizedPrev === "thought") return 30;
-    if (normalizedCurrent === "thought") return 26;
     const table = SPACING_MATRIX[normalizedPrev] || SPACING_MATRIX.narration;
     const key = table[normalizedCurrent] != null ? normalizedCurrent : "other";
     return table[key] ?? table.other;
@@ -476,12 +475,13 @@ function baseSpacing(prevType, currentType) {
 
 export function computeBubbleSpacing(prevType, currentType, variant) {
     const base = baseSpacing(prevType, currentType);
+    const normalizedPrev = normalizeSpacingType(prevType);
+    const normalizedCurrent = normalizeSpacingType(currentType);
     let marginTop = base;
     let marginBottom = base;
-    const normalizedCurrent = normalizeSpacingType(currentType);
-    if (normalizedCurrent === "thought") {
-        marginTop = Math.max(marginTop, 26);
-        marginBottom = Math.max(marginBottom, 26);
+    if (normalizedCurrent === "thought" || normalizedPrev === "thought") {
+        marginTop = Math.max(marginTop, THOUGHT_MARGIN);
+        marginBottom = Math.max(marginBottom, THOUGHT_MARGIN);
     }
     if (variant === "whisper-dark") {
         marginTop += 6;

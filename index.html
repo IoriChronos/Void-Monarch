@@ -173,24 +173,47 @@
                         <div class="icon"></div>
                         <p>设置</p>
                     </div>
+                    <div class="app-icon" data-target="shopping-page">
+                        <div class="icon"></div>
+                        <p>购物</p>
+                    </div>
+                    <div class="app-icon" data-target="mmo-page">
+                        <div class="icon"></div>
+                        <p>武侠</p>
+                    </div>
                 </div>
 
                 <!-- 微信页面 -->
                 <div id="wechat-page" class="app-page" style="display:none;">
                     <div class="page-header">
                         <button class="back-home">‹</button>
+                        <span id="wechat-top">Wechat (3)</span>
+                        <button id="contacts-add-btn" class="contact-add-btn" aria-label="添加好友">＋</button>
                         <div class="chat-window-head" id="chat-head-controls" style="display:none;">
-                            <button id="chat-back" aria-label="返回">‹</button>
-                            <button id="chat-recall-btn" class="chat-recall-btn" aria-label="撤回上一条" style="display:none;">撤回</button>
-                            <span class="chat-unread-total" id="chat-unread-total" style="display:none;"></span>
+                            <button id="chat-back" class="chat-head-btn" aria-label="返回">‹</button>
+                            <div class="chat-head-info">
+                                <span class="chat-title" id="chat-title"></span>
+                                <span class="chat-status" id="chat-status-text"></span>
+                                <span class="chat-unread-total" id="chat-unread-total" style="display:none;"></span>
+                            </div>
+                            <div class="chat-head-actions">
+                                <button id="chat-menu-btn" class="chat-menu-btn chat-head-btn" aria-label="更多选项">⋯</button>
+                                <div id="chat-head-menu" class="chat-head-menu" aria-hidden="true">
+                                    <button data-chat-menu="pin">置顶 / 取消</button>
+                                    <button data-chat-menu="block">拉黑 / 解除</button>
+                                </div>
+                            </div>
                         </div>
-                        <div class="wechat-top" id="wechat-top">Wechat (3)</div>
                     </div>
                     <div class="app-scroll wechat-body">
                         <div class="wechat-content">
                             <div class="wechat-panel" id="wechat-chats"></div>
+
                             <div class="wechat-panel wechat-moments-wrap" id="wechat-moments" style="display:none;">
                                 <div class="moments-hero">
+                                    <div class="moments-notice-slot">
+                                        <div id="moments-notice-rail" class="moments-notice-rail" style="display:none;"></div>
+                                    </div>
                                     <div class="moments-cover"></div>
                                     <div class="moments-avatar"></div>
                                 </div>
@@ -201,7 +224,17 @@
                                     </div>
                                 </div>
                                 <div class="moments-feed-inner" id="wechat-moments-feed"></div>
+                                <div id="moments-notice-panel" class="moments-notice-panel" aria-hidden="true">
+                                    <div class="moments-notice-inner">
+                                        <div class="notice-panel-head">
+                                            <span>通知记录</span>
+                                            <button id="moments-notice-close" aria-label="关闭">×</button>
+                                        </div>
+                                        <div class="moments-notice-list" id="moments-notice-list"></div>
+                                    </div>
+                                </div>
                             </div>
+
                             <div class="wechat-panel" id="wechat-wallet" style="display:none;">
                                 <div class="wallet-balance">
                                     <div class="label">零钱</div>
@@ -210,6 +243,7 @@
                                 </div>
                                 <div class="wallet-actions" id="wallet-actions"></div>
                             </div>
+
                             <div class="wechat-chat-window" id="wechat-chat-window" style="display:none;">
                                 <div class="chat-window-log" id="wechat-chat-log"></div>
                                 <div class="chat-window-input">
@@ -233,10 +267,35 @@
                                 </div>
                             </div>
                         </div>
+
                         <div class="wechat-tabs wechat-bottom-tabs" id="wechat-bottom">
                             <button data-wtab="chats" class="active">聊天</button>
                             <button data-wtab="moments">朋友圈</button>
                             <button data-wtab="wallet">钱包</button>
+                        </div>
+                    </div>
+
+                    <div id="chat-context-menu" class="chat-context-menu" aria-hidden="true">
+                        <button data-context-action="recall">撤回消息</button>
+                    </div>
+                    <div id="add-friend-modal" class="modal" aria-hidden="true">
+                        <div class="modal-content">
+                            <h3>添加好友</h3>
+                            <input id="add-friend-input" type="text" placeholder="输入名称">
+                            <div class="modal-actions">
+                                <button id="add-friend-confirm">发送请求</button>
+                                <button id="add-friend-cancel" class="ghost">取消</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="moment-delete-modal" class="modal" aria-hidden="true">
+                        <div class="modal-content">
+                            <h3>确认删除</h3>
+                            <p>删除后将移除这条动态并同步到记忆中，是否继续？</p>
+                            <div class="modal-actions">
+                                <button id="moment-delete-confirm">确认删除</button>
+                                <button id="moment-delete-cancel" class="ghost">取消</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -318,6 +377,28 @@
                         <div class="card-block">壁纸 · 默认</div>
                         <div class="card-block">AI 模型 · 待接入</div>
                         <div class="card-block">记忆清单 · 0 条</div>
+                    </div>
+                </div>
+                <!-- 购物页面 -->
+                <div id="shopping-page" class="app-page" style="display:none;">
+                    <div class="page-header">
+                        <button class="back-home">‹</button>
+                        <span>购物</span>
+                    </div>
+                    <div class="page-body app-scroll">
+                        <p>购物中心正在准备中……</p>
+                        <p>可以在这里创建采购清单、查看推荐或兑换物资。</p>
+                    </div>
+                </div>
+                <!-- 武侠（MMO）页面 -->
+                <div id="mmo-page" class="app-page" style="display:none;">
+                    <div class="page-header">
+                        <button class="back-home">‹</button>
+                        <span>侠客</span>
+                    </div>
+                    <div class="page-body app-scroll">
+                        <p>MMO 框架已搭建，等待剧情与交互填充。</p>
+                        <p>可以在这里查看门派、练功与战报。</p>
                     </div>
                 </div>
             </div>

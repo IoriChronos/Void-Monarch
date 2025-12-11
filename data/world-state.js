@@ -142,7 +142,7 @@ function createDefaultState() {
         systemVersion: SYSTEM_VERSION,
         story: defaultStory.map(entry => ({ ...entry, id: entry.id || createId("story") })),
         contacts: initialContacts.map(c => ({ ...c })),
-        chats: initialChats().map(enrichChat),
+        chats: initialChats().map((chat, idx) => enrichChat(chat, idx)),
         chatOrder: ["yuan", "room", "shadow", "sys"],
         moments: initialMoments().map(moment => enrichMoment(moment, initialContacts)),
         callHistory: initialCallHistory().map(entry => ({ ...entry })),
@@ -162,7 +162,7 @@ function createDefaultState() {
     };
 }
 
-function enrichChat(chat) {
+function enrichChat(chat, index = 0) {
     const log = (chat.log || chat.messages || []).map(entry => ({ ...entry }));
     return {
         id: chat.id,
@@ -171,7 +171,10 @@ function enrichChat(chat) {
         time: chat.time || "刚刚",
         unread: chat.unread || 0,
         log,
-        preview: chat.preview || computeChatPreview(log)
+        preview: chat.preview || computeChatPreview(log),
+        pinned: Boolean(chat.pinned),
+        blocked: Boolean(chat.blocked),
+        orderIndex: typeof chat.orderIndex === "number" ? chat.orderIndex : index
     };
 }
 
@@ -228,11 +231,15 @@ export function initializeWorldState(loadedState = null) {
             ...base,
             ...loadedState
         };
-        worldState.contacts = (loadedState.contacts || base.contacts).map(c => ({ ...c }));
-        worldState.chats = (loadedState.chats || base.chats).map(enrichChat);
-        worldState.chatOrder = loadedState.chatOrder || base.chatOrder;
-        worldState.moments = (loadedState.moments || base.moments).map(moment => enrichMoment(moment, worldState.contacts));
-        worldState.callHistory = (loadedState.callHistory || base.callHistory).map(entry => ({ ...entry }));
+        const contactsSeed = (loadedState.contacts && loadedState.contacts.length) ? loadedState.contacts : base.contacts;
+        worldState.contacts = contactsSeed.map(c => ({ ...c }));
+        const chatsSeed = (loadedState.chats && loadedState.chats.length) ? loadedState.chats : base.chats;
+        worldState.chats = chatsSeed.map((chat, idx) => enrichChat(chat, idx));
+        worldState.chatOrder = (loadedState.chatOrder && loadedState.chatOrder.length) ? loadedState.chatOrder : base.chatOrder;
+        const momentsSeed = (loadedState.moments && loadedState.moments.length) ? loadedState.moments : base.moments;
+        worldState.moments = momentsSeed.map(moment => enrichMoment(moment, worldState.contacts));
+        const callSeed = (loadedState.callHistory && loadedState.callHistory.length) ? loadedState.callHistory : base.callHistory;
+        worldState.callHistory = callSeed.map(entry => ({ ...entry }));
         worldState.memoEntries = (loadedState.memoEntries || []).slice(-50);
         worldState.eventsLog = (loadedState.eventsLog || []).slice(-100);
         worldState.wallet = loadedState.wallet || base.wallet;
@@ -248,6 +255,7 @@ export function initializeWorldState(loadedState = null) {
     } else {
         worldState = createDefaultState();
     }
+    sortChatsByPinned();
     refreshUnread();
     hydrateShortMemory(worldState.story);
     emit("world:init", { state: worldState });
@@ -455,23 +463,37 @@ export function appendSystemMessage(chatId, text, meta = {}) {
     return sendMessage(chatId, text, "in", meta);
 }
 
-export function withdrawChatMessage(chatId) {
+export function withdrawChatMessage(chatId, msgIndex = null) {
     const chat = getChatById(chatId);
     if (!chat || !chat.log?.length) return null;
-    const lastIndex = [...chat.log].map((entry, idx) => ({ entry, idx })).reverse().find(item => item.entry.from === "out");
-    if (!lastIndex) return null;
-    const removed = chat.log.splice(lastIndex.idx, 1)[0];
+    const target = msgIndex != null
+        ? { entry: chat.log[msgIndex], idx: msgIndex }
+        : [...chat.log].map((entry, idx) => ({ entry, idx })).reverse().find(item => item.entry.from === "out");
+    if (!target || !target.entry || target.entry.from !== "out") return null;
+    const entry = target.entry;
+    if (entry.recalled) return null;
+    const originalText = entry.text || "";
+    entry.text = `已撤回「${originalText}」`;
+    entry.recalled = true;
+    entry.kind = "recall";
+    entry.time = Date.now();
     const notice = {
         from: "system",
         text: "你撤回了一条消息。",
-        kind: "notice",
+        kind: "tip",
         time: Date.now()
     };
     chat.log.push(notice);
     chat.preview = computeChatPreview(chat.log);
     chat.time = "刚刚";
-    emit("chats:withdraw", { chatId, message: notice, removed });
-    return removed;
+    addShortEventMemory({
+        type: "chat-recall",
+        app: "wechat",
+        text: originalText,
+        meta: { chatId, msgIndex: target.idx }
+    });
+    emit("chats:withdraw", { chatId, message: notice, recalled: entry, msgIndex: target.idx });
+    return entry;
 }
 
 export function deleteMoment(momentId) {
@@ -693,6 +715,37 @@ export function sendRedPacket(amount) {
 export function openRedPacket(packetId, amount = 0) {
     adjustWalletBalance(Math.abs(Number(amount) || 0), { source: "红包" });
     emit("wallet:redpacket", { packetId, amount });
+}
+
+export function blockChat(chatId, blocked = true) {
+    const chat = getChatById(chatId);
+    if (!chat) return null;
+    chat.blocked = Boolean(blocked);
+    if (chat.blocked) {
+        chat.unread = 0;
+    }
+    emit("chats:block", { chatId, blocked: chat.blocked });
+    return chat;
+}
+
+export function setChatPinned(chatId, pinned = true) {
+    const chat = getChatById(chatId);
+    if (!chat) return null;
+    chat.pinned = Boolean(pinned);
+    sortChatsByPinned();
+    emit("chats:pinned", { chatId, pinned: chat.pinned });
+    return chat;
+}
+
+function sortChatsByPinned() {
+    if (!worldState.chats) return;
+    worldState.chats.sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        const aIndex = typeof a.orderIndex === "number" ? a.orderIndex : Infinity;
+        const bIndex = typeof b.orderIndex === "number" ? b.orderIndex : Infinity;
+        return aIndex - bIndex;
+    });
 }
 
 export function setBlackFogData(data) {

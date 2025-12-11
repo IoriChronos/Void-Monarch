@@ -26,7 +26,17 @@ export function initAIChatWindow(options = {}) {
     const characterCloseBtn = document.getElementById("character-sheet-close");
 
     if (!storyLog || !storyInput || !storySend) {
-        throw new Error("AI chat window elements missing");
+        console.warn("AI chat window elements missing, skipping initAIChatWindow");
+        return {
+            appendBubble: () => null,
+            replaceHistory: () => null,
+            updateBubble: () => null,
+            beginAiReplyGroup: () => null,
+            endAiReplyGroup: () => null,
+            showTimelineToast: () => null,
+            setBubbleSnapshot: () => null,
+            scrollToSnapshot: () => null
+        };
     }
 
     let systemMode = false;

@@ -8,6 +8,8 @@ import {
 import { initDynamicIsland } from "./ui/dynamic-island.js";
 import { initMemoApp, addMemoEntry } from "./apps/memo.js";
 import { initWeChatApp, triggerWeChatNotification, triggerMomentsNotification, refreshWeChatUI } from "./apps/wechat.js";
+import { initShoppingApp } from "./apps/shopping.js";
+import { initMMOApp } from "./apps/mmo.js";
 import { handleIslandCallAction, triggerIncomingCall, resetCallInterface } from "./apps/phone.js";
 import { setTriggerHandlers, checkTriggers } from "./core/triggers.js";
 import {
@@ -29,30 +31,41 @@ let storyUI = null;
 let storyBound = false;
 
 document.addEventListener("DOMContentLoaded", () => {
-    syncStateWithStorage();
-    saveSnapshot("boot");
-    initAbyssBackground();
-    initDynamicIsland({ onCallAction: handleIslandCallAction });
-    initClock();
-    initBattery();
+    const safe = (label, fn) => {
+        try {
+            return fn();
+        } catch (err) {
+            console.error(`[Init:${label}]`, err);
+            return null;
+        }
+    };
 
-    initMemoApp();
-    initPhoneUI({
+    safe("storage", () => syncStateWithStorage());
+    safe("snapshot", () => saveSnapshot("boot"));
+    safe("abyss-bg", () => initAbyssBackground());
+    safe("dynamic-island", () => initDynamicIsland({ onCallAction: handleIslandCallAction }));
+    safe("clock", () => initClock());
+    safe("battery", () => initBattery());
+
+    safe("memo", () => initMemoApp());
+    safe("shopping", () => initShoppingApp());
+    safe("mmo", () => initMMOApp());
+    safe("phone", () => initPhoneUI({
         onAppOpen: (id, label) => {
             const name = label || id;
             addMemoEntry(`打开 ${name}`);
             updateState("lastAppOpened", name);
         }
-    });
-    initWeChatApp();
-    setTriggerHandlers({
+    }));
+    safe("wechat", () => initWeChatApp());
+    safe("triggers", () => setTriggerHandlers({
         wechat: () => triggerWeChatNotification("剧情联动").catch(err => console.error(err)),
         call: () => triggerIncomingCall("元书 · 来电"),
         moments: (detail) => triggerMomentsNotification(detail || {}).catch(err => console.error(err)),
         notify: (label) => playSpecialFloatNotification(`${label} 提醒`)
-    });
+    }));
 
-    storyUI = initAIChatWindow({
+    storyUI = safe("story-ui", () => initAIChatWindow({
         onSubmit: handleStorySubmit,
         onSystemSubmit: handleSystemInput,
         onRestart: handleRestartRequest,
@@ -64,9 +77,9 @@ document.addEventListener("DOMContentLoaded", () => {
         providerOptions: getProviderOptions(),
         currentProvider: getActiveProviderId(),
         onProviderChange: handleProviderChange
-    });
-    hydrateStoryLog();
-    bindStoryStream();
+    })) || {};
+    safe("story-hydrate", () => hydrateStoryLog());
+    safe("story-stream", () => bindStoryStream());
 
     window.addEventListener("message", (event) => {
         if (typeof event.data === "string") {

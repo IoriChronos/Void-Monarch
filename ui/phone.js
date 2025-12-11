@@ -23,8 +23,11 @@ const APP_LABELS = {
     "watch-page": "守望",
     "memo-page": "备忘录",
     "heart-page": "心率",
-    "settings-page": "设置"
+    "settings-page": "设置",
+    "shopping-page": "购物",
+    "mmo-page": "武侠"
 };
+const ICON_ORDER_KEY = "homeIconOrder";
 
 function setPhoneVisible(show) {
     phoneVisible = show;
@@ -270,19 +273,95 @@ function attachIconDrag() {
             if (dragSrc && dragSrc !== icon) {
                 const parent = icon.parentNode;
                 parent.insertBefore(dragSrc, icon);
+                persistAppOrder();
             }
         });
         icon.addEventListener("dragend", () => {
             icon.classList.remove("dragging");
             dragSrc = null;
         });
+        icon.addEventListener("pointerdown", (e) => {
+            if (e.pointerType !== "touch") return;
+            icon.dataset.dragging = "false";
+            icon.setPointerCapture?.(e.pointerId);
+            icon.__dragStartX = e.clientX;
+            icon.__dragStartY = e.clientY;
+            icon.__pointerDragging = false;
+        });
+        icon.addEventListener("pointermove", (e) => {
+            if (e.pointerType !== "touch") return;
+            if (icon.__dragStartX == null) return;
+            const dx = e.clientX - (icon.__dragStartX || 0);
+            const dy = e.clientY - (icon.__dragStartY || 0);
+            if (!icon.__pointerDragging && Math.hypot(dx, dy) > 8) {
+                icon.__pointerDragging = true;
+                icon.classList.add("dragging");
+                icon.dataset.dragging = "true";
+            }
+            if (!icon.__pointerDragging) return;
+            const target = document.elementFromPoint(e.clientX, e.clientY)?.closest(".app-icon");
+            if (target && target !== icon && target.parentNode === homeScreen) {
+                const rect = target.getBoundingClientRect();
+                const before = e.clientY < rect.top + rect.height / 2;
+                homeScreen.insertBefore(icon, before ? target : target.nextSibling);
+            }
+        }, { passive: false });
+        const pointerEnd = (e) => {
+            if (e.pointerType !== "touch") return;
+            if (icon.__pointerDragging) {
+                persistAppOrder();
+                icon.classList.remove("dragging");
+            }
+            icon.dataset.dragging = "";
+            icon.__pointerDragging = false;
+            icon.__dragStartX = null;
+            icon.__dragStartY = null;
+            icon.releasePointerCapture?.(e.pointerId);
+        };
+        icon.addEventListener("pointerup", pointerEnd);
+        icon.addEventListener("pointercancel", pointerEnd);
     });
+}
+
+function persistAppOrder() {
+    if (!homeScreen) return;
+    const order = Array.from(homeScreen.querySelectorAll(".app-icon"))
+        .map(icon => icon.getAttribute("data-target"))
+        .filter(Boolean);
+    try {
+        localStorage.setItem(ICON_ORDER_KEY, JSON.stringify(order));
+    } catch (err) {
+        console.error("persistAppOrder", err);
+    }
+    appIcons = Array.from(document.querySelectorAll(".app-icon"));
+}
+
+function loadAppOrder() {
+    if (!homeScreen) return;
+    try {
+        const stored = localStorage.getItem(ICON_ORDER_KEY);
+        if (!stored) return;
+        const order = JSON.parse(stored);
+        if (!Array.isArray(order)) return;
+        const seen = new Set();
+        order.forEach(target => {
+            if (seen.has(target)) return;
+            seen.add(target);
+            const icon = homeScreen.querySelector(`.app-icon[data-target="${target}"]`);
+            if (icon) {
+                homeScreen.appendChild(icon);
+            }
+        });
+    } catch (err) {
+        console.error("loadAppOrder", err);
+    }
 }
 
 export function initPhoneUI(options = {}) {
     optionsRef = options;
     body = document.body;
     homeScreen = document.getElementById("home-screen");
+    loadAppOrder();
     appPages = Array.from(document.querySelectorAll(".app-page"));
     appIcons = Array.from(document.querySelectorAll(".app-icon"));
     backButtons = Array.from(document.querySelectorAll(".back-home"));
@@ -293,6 +372,10 @@ export function initPhoneUI(options = {}) {
 
     appIcons.forEach(icon => {
         icon.addEventListener("click", () => {
+            if (icon.dataset.dragging === "true") {
+                icon.dataset.dragging = "";
+                return;
+            }
             const target = icon.getAttribute("data-target");
             if (!target) return;
             icon.classList.add("launching");

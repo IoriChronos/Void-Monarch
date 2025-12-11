@@ -38,6 +38,7 @@ export function initWeChatApp() {
         moments: document.getElementById("wechat-moments"),
         wallet: document.getElementById("wechat-wallet"),
     };
+    const wechatPage = document.getElementById("wechat-page");
     const chatWindow = document.getElementById("wechat-chat-window");
     const chatHeadControls = document.getElementById("chat-head-controls");
     const chatRecallBtn = document.getElementById("chat-recall-btn");
@@ -261,14 +262,21 @@ export function initWeChatApp() {
         contactsAddBtn.style.display = show ? "inline-flex" : "none";
     }
 
+    function setWeChatMode(mode) {
+        if (!wechatPage) return;
+        const modes = ["list", "moments", "wallet", "chat"];
+        modes.forEach(m => wechatPage.classList.remove(`mode-${m}`));
+        if (mode && modes.includes(mode)) {
+            wechatPage.classList.add(`mode-${mode}`);
+        }
+    }
+
     function toggleMainHeader(show, text) {
         if (wechatTop) {
             wechatTop.style.visibility = show ? "visible" : "hidden";
             if (typeof text === "string") wechatTop.textContent = text;
         }
-        if (contactsAddBtn) {
-            contactsAddBtn.style.display = show ? "inline-flex" : "none";
-        }
+        toggleAddFriendButton(show && (!chatWindow || chatWindow.style.display === "none"));
     }
 
     function updateChatActionControls(chat) {
@@ -288,7 +296,6 @@ export function initWeChatApp() {
             chatStatusText.style.opacity = statusParts.length ? "0.8" : "0";
         }
         updateChatInputState(chat);
-        toggleAddFriendButton(!chatWindow || chatWindow.style.display === "none");
     }
 
     let contextTarget = null;
@@ -298,7 +305,12 @@ export function initWeChatApp() {
     function showChatContextMenuAt(row, x, y) {
         if (!chatContextMenu || !row) return;
         const chatId = row.dataset.chatId;
+        const msgIndex = row.dataset.msgIndex;
         if (!chatId) return;
+        // skip recalled or non-out messages
+        const chat = getAllChats().find(c => c.id === chatId);
+        const entry = chat?.log?.[msgIndex];
+        if (!entry || entry.from !== "out" || entry.recalled) return;
         contextTarget = chatId;
         if (contextTimer) {
             clearTimeout(contextTimer);
@@ -311,19 +323,35 @@ export function initWeChatApp() {
         chatContextMenu.style.top = `${posY}px`;
         chatContextMenu.classList.add("show");
         chatContextMenu.dataset.chatId = chatId;
+        if (msgIndex != null) {
+            chatContextMenu.dataset.msgIndex = msgIndex;
+        } else {
+            chatContextMenu.removeAttribute("data-msg-index");
+        }
     }
 
     function closeChatContextMenu() {
         if (!chatContextMenu) return;
         chatContextMenu.classList.remove("show");
         chatContextMenu.removeAttribute("data-chat-id");
+        chatContextMenu.removeAttribute("data-msg-index");
         contextTarget = null;
+    }
+
+    function attemptContextMenu(event) {
+        const row = event.target.closest(".chat-row");
+        if (!row || row.dataset.from !== "out") return;
+        const { clientX, clientY } = event.touches?.[0] || event;
+        event.preventDefault();
+        showChatContextMenuAt(row, clientX, clientY);
     }
 
     function handleContextRecall() {
         const chatId = chatContextMenu?.dataset?.chatId;
+        const msgIndexAttr = chatContextMenu?.dataset?.msgIndex;
+        const msgIndex = msgIndexAttr != null ? Number(msgIndexAttr) : null;
         if (!chatId) return;
-        withdrawChatMessage(chatId);
+        withdrawChatMessage(chatId, msgIndex);
         renderChats();
         openChat(chatId);
         showMessageBanner("微信", "你撤回了一条消息。");
@@ -471,12 +499,14 @@ export function initWeChatApp() {
             : kind === "like"
                 ? "朋友圈点赞"
                 : "朋友圈评论";
+        const who = detail.fromName || detail.authorName || detail.who || detail.contactName || "";
+        const namePrefix = who ? `${who}：` : "";
         const entry = {
             id: `notice-${kind}-${Date.now()}`,
             kind,
             label,
             momentId: detail.momentId,
-            text: detail.snippet || detail.momentText || label,
+            text: namePrefix + (detail.snippet || detail.momentText || label),
             time: detail.time || Date.now()
         };
         momentNotifications.unshift(entry);
@@ -489,20 +519,42 @@ export function initWeChatApp() {
     function renderMomentNoticeRail() {
         if (!momentsNoticeRail) return;
         const has = momentNotifications.length > 0;
-        momentsNoticeRail.style.display = has ? "block" : "none";
+        momentsNoticeRail.style.display = "block";
+        momentsNoticeRail.classList.toggle("has-notice", has);
+        momentsNoticeRail.dataset.count = has ? momentNotifications.length : "";
+        let label = momentsNoticeRail.querySelector(".notice-label");
+        if (!label) {
+            label = document.createElement("span");
+            label.className = "notice-label";
+            momentsNoticeRail.appendChild(label);
+        }
+        label.textContent = has ? "未读通知" : "";
     }
 
     function openMomentNoticePanel() {
         if (!momentsNoticePanel) return;
+        if (panels.moments) {
+            panels.moments.scrollTop = 0;
+        }
         renderMomentNoticeList();
         momentsNoticePanel.classList.add("show");
         momentsNoticePanel.setAttribute("aria-hidden", "false");
+        // 已查看未读，清空未读标签
+        renderMomentNoticeRail();
+        if (panels.moments) {
+            panels.moments.classList.add("notice-open");
+            panels.moments.style.overflow = "hidden";
+        }
     }
 
     function closeMomentNoticePanel() {
         if (!momentsNoticePanel) return;
         momentsNoticePanel.classList.remove("show");
         momentsNoticePanel.setAttribute("aria-hidden", "true");
+        if (panels.moments) {
+            panels.moments.classList.remove("notice-open");
+            panels.moments.style.overflow = "";
+        }
     }
 
     function renderMomentNoticeList() {
@@ -907,6 +959,7 @@ export function initWeChatApp() {
         if (chatHeadControls) chatHeadControls.style.display = "none";
         toggleAddFriendButton(target === "chats");
         toggleMainHeader(target === "chats", target === "chats" ? `Wechat (${totalUnreadCount()})` : wechatTop?.textContent);
+        setWeChatMode(target === "chats" ? "list" : target === "moments" ? "moments" : target === "wallet" ? "wallet" : "list");
         setChatActions(false);
         hideRedEnvelopeOverlay();
         const unread = totalUnreadCount();
@@ -953,6 +1006,7 @@ export function initWeChatApp() {
             row.dataset.chatId = c.id;
             row.dataset.msgIndex = idx;
             row.dataset.from = m.from;
+            if (m.recalled) row.dataset.recalled = "1";
             if (!isTip && m.from !== "system") {
                 const avatar = document.createElement("div");
                 avatar.className = "chat-avatar";
@@ -974,6 +1028,7 @@ export function initWeChatApp() {
         chatWindow.style.display = "flex";
         if (wechatBottom) wechatBottom.style.display = "none";
         toggleMainHeader(false);
+        setWeChatMode("chat");
         // keep the top title showing total/unread when list is visible; chat title lives inside header
         if (chatTitle) chatTitle.textContent = c.name;
         if (chatHeadControls) chatHeadControls.style.display = "flex";
@@ -1066,8 +1121,9 @@ export function initWeChatApp() {
 
     function handleIncomingMessage(chat, msg) {
         if (!chat) return;
-        if (chat.blocked) {
-            appendSystemMessage(chat.id, "你已屏蔽该联系人，消息不会出现在对话中。");
+        const isSystemLike = msg?.kind === "tip" || msg?.kind === "notice" || msg?.from === "system";
+        if (chat.blocked && !isSystemLike) {
+            appendSystemMessage(chat.id, "你已屏蔽该联系人，消息不会出现在对话中。", { kind: "tip" });
             renderChats();
             return;
         }
@@ -1133,8 +1189,9 @@ export function initWeChatApp() {
             const row = event.target.closest(".chat-row");
             if (!row || row.dataset.from !== "out") return;
             activeRow = row;
+            const { clientX, clientY } = event.touches?.[0] || event;
             contextTimer = window.setTimeout(() => {
-                showChatContextMenuAt(row, event.clientX, event.clientY);
+                showChatContextMenuAt(row, clientX, clientY);
             }, 520);
         };
         const clearPointerTimer = () => {
@@ -1145,14 +1202,14 @@ export function initWeChatApp() {
             activeRow = null;
         };
         chatLog.addEventListener("contextmenu", event => {
-            const row = event.target.closest(".chat-row");
-            if (!row || row.dataset.from !== "out") return;
-            event.preventDefault();
-            showChatContextMenuAt(row, event.clientX, event.clientY);
+            attemptContextMenu(event);
         });
         chatLog.addEventListener("pointerdown", handlePointerDown);
         chatLog.addEventListener("pointerup", clearPointerTimer);
         chatLog.addEventListener("pointerleave", clearPointerTimer);
+        chatLog.addEventListener("touchstart", handlePointerDown, { passive: false });
+        chatLog.addEventListener("touchend", clearPointerTimer);
+        chatLog.addEventListener("touchcancel", clearPointerTimer);
     }
     if (chatActionsToggle) {
         chatActionsToggle.addEventListener("click", () => {
@@ -1449,10 +1506,6 @@ export function initWeChatApp() {
     renderWallet();
     renderMomentNoticeRail();
     switchTab("chats");
-    const initialChats = getAllChats();
-    if (!chatWindow?.dataset?.chat && initialChats.length) {
-        openChat(initialChats[0].id);
-    }
 
     updateWalletDisplay();
 
