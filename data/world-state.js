@@ -426,6 +426,7 @@ export function addChatMessage(chatId, message = {}) {
         refreshUnread();
     }
     emit("chats:message", { chatId, message: entry });
+    return entry;
 }
 
 export function markChatRead(chatId) {
@@ -499,6 +500,12 @@ export function likeMoment(momentId, userId = "player", liked = true) {
         moment.likedByUser = shouldLike;
     }
     moment.likes = Math.max(0, (moment.likes || 0) + delta);
+    addShortEventMemory({
+        type: shouldLike ? "moment_like" : "moment_unlike",
+        app: "moments",
+        text: `${userId === "player" ? "I" : userId} ${shouldLike ? "liked" : "unliked"} a moment.`,
+        meta: { momentId, userId }
+    });
     emit("moments:like", { momentId, userId, liked: shouldLike });
     return moment;
 }
@@ -509,6 +516,12 @@ export function addMomentPost(post) {
         id: post.id || `moment-${Date.now()}`
     }, worldState.contacts);
     worldState.moments.unshift(entry);
+    addShortEventMemory({
+        type: "moment_post",
+        app: "moments",
+        text: `New moment posted: "${entry.text}"`,
+        meta: { momentId: entry.id, authorId: entry.authorId }
+    });
     emit("moments:post", { post: entry });
     return entry;
 }

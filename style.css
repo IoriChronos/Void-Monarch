@@ -3433,3 +3433,50 @@ body.pc-mode.phone-open #phone-layer {
 .story-bubble.bubble-center {
     align-self: center;
 }
+
+/* --- Mobile Context Menu (Bottom Sheet) --- */
+#story-context-menu.mobile-sheet {
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+#story-context-menu.mobile-sheet .context-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    border-radius: 24px 24px 0 0;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 10px);
+    animation: slideUp 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    background: rgba(28,16,26,0.92);
+    backdrop-filter: blur(16px);
+}
+
+#story-context-menu.mobile-sheet button {
+    padding: 14px 18px;
+    font-size: 14px;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+/* --- Responsive Adjustments --- */
+@media (max-width: 768px) {
+    .story-edit-sheet .edit-panel {
+        width: 95%;
+        max-height: 80vh;
+    }
+
+    .story-edit-sheet textarea {
+        min-height: 200px;
+        max-height: 50vh;
+        font-size: 14px;
+    }
+}

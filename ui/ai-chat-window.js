@@ -127,7 +127,51 @@ export function initAIChatWindow(options = {}) {
     }
 
     function attachBubbleMenu(bubble, entry) {
+        let pressTimer = null;
+        let startX, startY;
+
+        const startPress = (e) => {
+            // Ignore right-clicks on touch devices
+            if (e.pointerType === 'touch' && e.button === 2) {
+                return;
+            }
+            startX = e.clientX;
+            startY = e.clientY;
+            pressTimer = setTimeout(() => {
+                pressTimer = null;
+                if (e.target.closest('a, button')) return;
+                e.preventDefault();
+                openBubbleMenu(e, entry);
+            }, 550); 
+        };
+
+        const cancelPress = (e) => {
+            if (pressTimer) {
+                clearTimeout(pressTimer);
+                pressTimer = null;
+            }
+        };
+
+        const moveCheck = (e) => {
+            if (pressTimer) {
+                const moveX = Math.abs(e.clientX - startX);
+                const moveY = Math.abs(e.clientY - startY);
+                if (moveX > 10 || moveY > 10) {
+                    cancelPress();
+                }
+            }
+        };
+
+        bubble.addEventListener("pointerdown", startPress);
+        bubble.addEventListener("pointerup", cancelPress);
+        bubble.addEventListener("pointerleave", cancelPress);
+        bubble.addEventListener("pointermove", moveCheck);
+        
         bubble.addEventListener("contextmenu", (event) => {
+            if (pressTimer) {
+                clearTimeout(pressTimer);
+                pressTimer = null;
+            }
             event.preventDefault();
             openBubbleMenu(event, entry);
         });
@@ -136,12 +180,15 @@ export function initAIChatWindow(options = {}) {
     function openBubbleMenu(event, entry) {
         const actions = resolveBubbleActions(entry);
         if (!actions.length) return;
+
         if (!contextMenu) {
             contextMenu = document.createElement("div");
             contextMenu.id = "story-context-menu";
             document.body.appendChild(contextMenu);
         }
         contextMenu.innerHTML = "";
+        contextMenu.className = ""; // Reset classes
+
         const panel = document.createElement("div");
         panel.className = "context-panel";
         actions.forEach(action => {
@@ -159,36 +206,67 @@ export function initAIChatWindow(options = {}) {
             panel.appendChild(btn);
         });
         contextMenu.appendChild(panel);
-        const rect = panel.getBoundingClientRect();
-        const maxX = Math.max(12, window.innerWidth - rect.width - 12);
-        const maxY = Math.max(12, window.innerHeight - rect.height - 12);
-        const offsetX = Math.min(Math.max(12, event.clientX), maxX);
-        const offsetY = Math.min(Math.max(12, event.clientY), maxY);
-        panel.style.left = `${offsetX}px`;
-        panel.style.top = `${offsetY}px`;
+
+        const isMobile = window.innerWidth < 768;
+
+        if (isMobile) {
+            contextMenu.classList.add("mobile-sheet");
+        } else {
+            const rect = panel.getBoundingClientRect();
+            const margin = 12;
+            const clickX = event.clientX;
+            const clickY = event.clientY;
+
+            let offsetX = clickX;
+            if (clickX + rect.width > window.innerWidth - margin) {
+                offsetX = window.innerWidth - rect.width - margin;
+            }
+
+            let offsetY = clickY;
+            if (clickY + rect.height > window.innerHeight - margin) {
+                offsetY = window.innerHeight - rect.height - margin;
+            }
+
+            panel.style.left = `${Math.max(margin, offsetX)}px`;
+            panel.style.top = `${Math.max(margin, offsetY)}px`;
+        }
+        
         contextMenu.classList.add("show");
+
         const closeHandler = (e) => {
             if (contextMenu && !panel.contains(e.target)) {
                 closeBubbleMenu();
             }
         };
         contextMenu._closeHandler = closeHandler;
-        document.addEventListener("mousedown", closeHandler, { once: true });
-        contextMenu.addEventListener("mousedown", (evt) => {
-            if (!panel.contains(evt.target)) {
-                closeBubbleMenu();
-            }
-        }, { once: true });
+        
+        // Use a short timeout to prevent the same click/tap from closing the menu immediately
+        setTimeout(() => {
+            document.addEventListener("mousedown", closeHandler);
+            contextMenu.addEventListener("click", (evt) => {
+                if (evt.target === contextMenu) {
+                    closeBubbleMenu();
+                }
+            }, { once: true });
+        }, 100);
     }
 
     function closeBubbleMenu() {
-        if (!contextMenu) return;
+        if (!contextMenu || !contextMenu.classList.contains("show")) return;
         contextMenu.classList.remove("show");
-        contextMenu.innerHTML = "";
+        
         if (contextMenu._closeHandler) {
             document.removeEventListener("mousedown", contextMenu._closeHandler);
             contextMenu._closeHandler = null;
         }
+        
+        // Allow animations to finish before clearing content
+        setTimeout(() => {
+            if (!contextMenu.classList.contains("show")) {
+                contextMenu.innerHTML = "";
+                contextMenu.className = "";
+            }
+        }, 300);
     }
 
     document.addEventListener("keydown", (event) => {
