@@ -1,4 +1,5 @@
 import { initSceneEffects } from "./scene-effects.js";
+import { createPixelIconCanvas } from "./pixel.js";
 
 const TAG_TYPE = {
     N: "narration",
@@ -117,7 +118,7 @@ export function renderStoryBubble(entry, options = {}) {
         node.appendChild(content);
 
         if (meta.type === "system") {
-            const icon = createPixelCanvas();
+            const icon = createPixelIconCanvas();
             if (icon) {
                 icon.classList.add("system-icon");
                 const side = Math.random() > 0.5 ? "right" : "left";
@@ -268,63 +269,6 @@ function formatParagraph(text, meta, isFirst) {
     }
     applyParagraphStyles(trimmed, classes);
     return `<p${classes.length ? ` class="${classes.join(" ")}"` : ""}>${html}</p>`;
-}
-
-function createPixelCanvas() {
-    const canvas = document.createElement("canvas");
-    canvas.width = 22;
-    canvas.height = 22;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return canvas;
-    ctx.clearRect(0, 0, 22, 22);
-    const drawers = [drawEye, drawPulse, drawEnvelope];
-    const picked = drawers[Math.floor(Math.random() * drawers.length)];
-    picked(ctx);
-    return canvas;
-}
-
-function drawEye(ctx) {
-    ctx.fillStyle = "#050207";
-    ctx.fillRect(0, 0, 22, 22);
-    ctx.fillStyle = "#2f0f2a";
-    ctx.fillRect(4, 9, 14, 4);
-    ctx.fillStyle = "#d7c1ff";
-    ctx.fillRect(6, 8, 10, 6);
-    ctx.fillStyle = "#1a072d";
-    ctx.fillRect(9, 9, 4, 4);
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(10, 10, 1, 1);
-}
-
-function drawPulse(ctx) {
-    ctx.fillStyle = "#060209";
-    ctx.fillRect(0, 0, 22, 22);
-    ctx.fillStyle = "#3e0f2c";
-    ctx.fillRect(2, 10, 18, 2);
-    ctx.fillStyle = "#ff9cc2";
-    ctx.fillRect(4, 10, 3, 2);
-    ctx.fillRect(7, 7, 2, 5);
-    ctx.fillRect(9, 7, 3, 2);
-    ctx.fillRect(12, 7, 2, 7);
-    ctx.fillRect(14, 10, 4, 2);
-}
-
-function drawEnvelope(ctx) {
-    ctx.fillStyle = "#040209";
-    ctx.fillRect(0, 0, 22, 22);
-    ctx.fillStyle = "#a0ffc6";
-    ctx.fillRect(3, 6, 16, 10);
-    ctx.fillStyle = "#07130d";
-    ctx.fillRect(4, 7, 14, 8);
-    ctx.fillStyle = "#a0ffc6";
-    ctx.fillRect(4, 8, 14, 6);
-    ctx.fillStyle = "#0a1810";
-    ctx.beginPath();
-    ctx.moveTo(4, 8);
-    ctx.lineTo(11, 13);
-    ctx.lineTo(18, 8);
-    ctx.closePath();
-    ctx.fill();
 }
 
 function applyKeywordHighlighting(text = "") {

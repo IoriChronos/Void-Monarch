@@ -37,7 +37,7 @@ const abyssCooldown = {
 };
 const ABYSS_MIN_INTERVAL = {
     fog: 4500,
-    tentacle: 7200,
+    tentacle: 3000,
     wave: 5200,
     gaze: 5200
 };

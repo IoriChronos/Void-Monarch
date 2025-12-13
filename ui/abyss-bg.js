@@ -108,8 +108,8 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
     let fogTimer = null;
     let waveTimer = null;
     let gazeTimer = null;
-    let tentacleCount = 0;
-    let overlayTentacleCount = 0;
+    let tentacleCountBase = 0;
+    let tentacleCountOverlay = 0;
     let dimTimer = null;
     let glitchTimer = null;
     let warpTimer = null;
@@ -168,50 +168,87 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
             spawnFogSweep("upper", power);
         },
         summonTentacle(options = {}) {
-            const { count = 1, speed = 1, thickness = 1 } = options;
+            const {
+                count = 1,
+                speed = 1,
+                thickness = 1,
+                layer = "base"
+            } = options;
             if (!tentacleLayer) return;
-            if (tentacleCount > 4) return;
-            const spawnCount = Math.max(1, Math.min(3, Math.round(count)));
-            let overlaySpawned = false;
+
+            const spawnCount = Math.max(1, Math.min(2, Math.round(count)));
             for (let i = 0; i < spawnCount; i++) {
+                const wantOverlay = layer === "top" || layer === "overlay";
+                const targetLayer = wantOverlay && upperTentacleLayer ? upperTentacleLayer : tentacleLayer;
+                if (!targetLayer) continue;
+                if (wantOverlay) {
+                    if (tentacleCountOverlay >= 1) continue;
+                    tentacleCountOverlay++;
+                } else {
+                    if (tentacleCountBase >= 1) continue;
+                    tentacleCountBase++;
+                }
+
+                const spawn = pickSpawnPoint(width, height);
+                const angle = computeTentacleAngle(spawn, width, height);
                 const t = document.createElement("div");
                 t.className = "abyss-tentacle";
+                if (wantOverlay) t.classList.add("overlay");
+                t.dataset.edge = spawn.edge || "inner";
                 const base = document.createElement("div");
                 base.className = "tentacle-base";
                 const body = document.createElement("div");
                 body.className = "tentacle-body";
-                t.append(base, body);
-                const overlay = !overlaySpawned && Math.random() < 0.3;
-                const targetLayer = overlay && upperTentacleLayer ? upperTentacleLayer : tentacleLayer;
-                if (overlay) {
-                    t.classList.add("overlay");
-                    const top = -4 + Math.random() * 36;
-                    t.style.top = `${top.toFixed(1)}%`;
-                    t.style.bottom = "auto";
-                    overlaySpawned = true;
-                }
-                const scale = 0.8 + Math.random() * 0.6;
-                const wiggle = (0.8 + Math.random() * 0.6) * speed;
-                const px = -10 + Math.random() * 100;
-                const delay = Math.random() * 0.6;
-                const life = 4800 + Math.random() * 2600;
-                const thicknessScale = 0.7 + Math.random() * 0.7 * thickness;
+                const head = document.createElement("div");
+                head.className = "tentacle-head";
+                t.append(base, body, head);
+
+                t.style.setProperty("--tentacle-x", `${spawn.x.toFixed(1)}px`);
+                t.style.setProperty("--tentacle-y", `${spawn.y.toFixed(1)}px`);
+                t.style.setProperty("--tentacle-angle", `${angle.toFixed(1)}deg`);
+
+                const scale = 0.9 + Math.random() * 0.5;
+                const wiggle = (0.9 + Math.random() * 0.5) * speed;
+                const delay = Math.random() * 0.4;
+                const thicknessScale = 0.8 + Math.random() * 0.5 * thickness;
+                const enterDur = 0.95 + Math.random() * 0.25;
+                const idleDur = (1.4 + Math.random() * 0.8) / Math.max(0.45, speed);
+                const retreatDur = 1.05 + Math.random() * 0.2;
+
                 t.style.setProperty("--tentacle-scale", scale.toFixed(2));
                 t.style.setProperty("--tentacle-wiggle", wiggle.toFixed(2));
-                t.style.setProperty("--tentacle-left", `${px.toFixed(1)}%`);
                 t.style.setProperty("--tentacle-delay", `${delay.toFixed(2)}s`);
                 t.style.setProperty("--tentacle-thickness", thicknessScale.toFixed(2));
-                const edge = pick(["left", "right", "bottom"]);
-                t.style.setProperty("--tentacle-edge", edge);
-                (targetLayer || tentacleLayer).appendChild(t);
-                tentacleCount++;
-                setTimeout(() => {
+                t.style.setProperty("--tentacle-enter-dur", `${enterDur.toFixed(2)}s`);
+                t.style.setProperty("--tentacle-idle-dur", `${idleDur.toFixed(2)}s`);
+                t.style.setProperty("--tentacle-retreat-dur", `${retreatDur.toFixed(2)}s`);
+
+                targetLayer.appendChild(t);
+
+                const totalLife = (delay + enterDur + idleDur + retreatDur + 0.2) * 1000;
+                const retreatAt = (delay + enterDur + idleDur) * 1000;
+                let cleaned = false;
+
+                const cleanup = () => {
+                    if (cleaned) return;
+                    cleaned = true;
+                    t.remove();
+                    if (wantOverlay) {
+                        tentacleCountOverlay = Math.max(0, tentacleCountOverlay - 1);
+                    } else {
+                        tentacleCountBase = Math.max(0, tentacleCountBase - 1);
+                    }
+                };
+
+                const retreatTimer = setTimeout(() => {
                     t.classList.add("retreat");
-                    setTimeout(() => {
-                        t.remove();
-                        tentacleCount = Math.max(0, tentacleCount - 1);
-                    }, 1200);
-                }, life);
+                    setTimeout(cleanup, 1400);
+                }, retreatAt);
+
+                setTimeout(() => {
+                    clearTimeout(retreatTimer);
+                    cleanup();
+                }, totalLife);
             }
         },
         pressureWave(mode = "pulse", intensity = 1) {
@@ -330,47 +367,32 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
                 cloud.style.setProperty("--cloud-stroke", "#92a3e0");
                 cloud.style.setProperty("--cloud-glow", "rgba(130,158,240,0.55)");
             } else {
-        cloud.style.setProperty("--cloud-fill", "#ffe7c8");
-        cloud.style.setProperty("--cloud-stroke", "#ffd6a2");
-        cloud.style.setProperty("--cloud-glow", "rgba(255,216,172,0.6)");
-    }
+                cloud.style.setProperty("--cloud-fill", "#ffe7c8");
+                cloud.style.setProperty("--cloud-stroke", "#ffd6a2");
+                cloud.style.setProperty("--cloud-glow", "rgba(255,216,172,0.6)");
+            }
 
-    function spawnTentacleBase(edge = "left") {
-        const y = Math.random() * 100;
-        const x = Math.random() * 100;
-        if (edge === "left") return { x: `${-8 + Math.random() * 6}%`, y: `${y.toFixed(1)}%` };
-        if (edge === "right") return { x: `${104 + Math.random() * 6}%`, y: `${y.toFixed(1)}%` };
-        // bottom
-        return { x: `${x.toFixed(1)}%`, y: `${104 + Math.random() * 6}%` };
-    }
-
-    function inwardAngle(edge = "left") {
-        if (edge === "left") return 0 + Math.random() * 30;
-        if (edge === "right") return 150 + Math.random() * 30;
-        return 270 - Math.random() * 30;
-    }
-
-        const offsetX = (Math.random() - 0.5) * 10;
-        const offsetY = (Math.random() - 0.5) * 8;
-        const pos = { x: anchor.x + offsetX, y: anchor.y + offsetY };
-        cloud.style.left = `${pos.x}%`;
-        cloud.style.top = `${pos.y}%`;
-        const spriteUrl = cloudSprites[palette === "dark" ? "dark" : "light"][variant];
-        cloud.style.backgroundImage = `url(${spriteUrl})`;
-        const baseW = 220;
-        const baseH = 140;
-        cloud.style.width = `${baseW * 0.6}px`;
-        cloud.style.height = `${baseH * 0.6}px`;
-        cloud.style.transform = `scale(${scale.toFixed(2)})`;
-        cloud.style.transformOrigin = "center";
-        const alphaMax = palette === "dark" ? 0.95 : 0.96;
-        const alphaMin = alphaMax - 0.12;
-        const alpha = alphaMax - ((scale - minScale) / (maxScale - minScale)) * 0.12;
-        cloud.style.opacity = Math.max(alphaMin, Math.min(alphaMax, alpha)).toFixed(2);
-        cloudPack.appendChild(cloud);
-        cloudPositions.push(pos);
-        avgScale += (scale - avgScale) / (i + 1);
-    }
+            const offsetX = (Math.random() - 0.5) * 10;
+            const offsetY = (Math.random() - 0.5) * 8;
+            const pos = { x: anchor.x + offsetX, y: anchor.y + offsetY };
+            cloud.style.left = `${pos.x}%`;
+            cloud.style.top = `${pos.y}%`;
+            const spriteUrl = cloudSprites[palette === "dark" ? "dark" : "light"][variant];
+            cloud.style.backgroundImage = `url(${spriteUrl})`;
+            const baseW = 220;
+            const baseH = 140;
+            cloud.style.width = `${baseW * 0.6}px`;
+            cloud.style.height = `${baseH * 0.6}px`;
+            cloud.style.transform = `scale(${scale.toFixed(2)})`;
+            cloud.style.transformOrigin = "center";
+            const alphaMax = palette === "dark" ? 0.95 : 0.96;
+            const alphaMin = alphaMax - 0.12;
+            const alpha = alphaMax - ((scale - minScale) / (maxScale - minScale)) * 0.12;
+            cloud.style.opacity = Math.max(alphaMin, Math.min(alphaMax, alpha)).toFixed(2);
+            cloudPack.appendChild(cloud);
+            cloudPositions.push(pos);
+            avgScale += (scale - avgScale) / (i + 1);
+        }
 
         // pack-level drift so云束整体移动，内部相对关系锁定
         const drift = computeDrift(anchor.x, anchor.y, avgScale, palette === "dark" ? "right" : "left");
@@ -381,6 +403,36 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
         (host || baseLayer).appendChild(node);
         const ttl = Math.max(6, drift.dur + 2.2);
         setTimeout(() => node.remove(), ttl * 1000);
+    }
+
+    function pickSpawnPoint(w, h) {
+        const edges = ["left", "right", "top", "bottom"];
+        const edge = pick(edges);
+        const bandX = { min: w * 0.3, max: w * 0.7 }; // 中点±40% → 30%~70%
+        const bandY = { min: h * 0.3, max: h * 0.7 };
+        if (edge === "left") {
+            const y = clamp(bandY.min + Math.random() * (bandY.max - bandY.min), 0, h);
+            return { edge, x: 0, y };
+        }
+        if (edge === "right") {
+            const y = clamp(bandY.min + Math.random() * (bandY.max - bandY.min), 0, h);
+            return { edge, x: w, y };
+        }
+        if (edge === "top") {
+            const x = clamp(bandX.min + Math.random() * (bandX.max - bandX.min), 0, w);
+            return { edge, x, y: 0 };
+        }
+        // bottom
+        const x = clamp(bandX.min + Math.random() * (bandX.max - bandX.min), 0, w);
+        return { edge: "bottom", x, y: h };
+    }
+
+    function computeTentacleAngle(spawn, w, h) {
+        if (!spawn.edge) return 0;
+        if (spawn.edge === "left") return 90;
+        if (spawn.edge === "right") return -90;
+        if (spawn.edge === "top") return 180;
+        return 0; // bottom
     }
 
     function spawnJumpPixels() {
@@ -435,18 +487,6 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
         });
         eggFx.appendChild(img);
         setTimeout(() => eggFx.innerHTML = "", 2400);
-    }
-
-    function randomSpawnLeft() {
-        const y = 18 + Math.random() * 60;
-        const x = 4 + Math.random() * 12; // 画面内左侧
-        return { x, y };
-    }
-
-    function randomSpawnRight() {
-        const y = 16 + Math.random() * 60;
-        const x = 84 + Math.random() * 12; // 画面内右侧
-        return { x, y };
     }
 
     function computeDrift(xPerc, yPerc, scale, side) {
@@ -652,4 +692,8 @@ function wrapParticle(p, width, height) {
 
 function pick(list) {
     return list[Math.floor(Math.random() * list.length)];
+}
+
+function clamp(v, min, max) {
+    return Math.min(max, Math.max(min, v));
 }

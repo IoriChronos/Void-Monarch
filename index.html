@@ -11,22 +11,27 @@
 <div id="app">
     <!-- 剧情主面板 -->
     <section id="story-panel">
-        <header id="story-header">
-            <div class="story-title"></div>
-            <div class="story-subtitle">轨迹 • He Loves You. The World Fears Him.</div>
-        </header>
-        <div id="character-sheet" class="character-sheet" aria-hidden="true">
-            <div class="sheet-inner">
-                <button id="character-sheet-close" type="button">收合</button>
-                <h3>角色档案 · 元书</h3>
-                <p>身影固定在城市的霓虹下，习惯以低沉的宣告和缓慢的呼吸控制一切。如同黑雾的代理人，记得每一次心跳、每一条规则。</p>
-                <p>喜好：靠近、降温、热牛奶、泡芙。<br>禁忌：被忽视、未经允许的逃离。</p>
-                <p>提示：若他说“别浪费时间”，代表剧情正在推进到更危险的阶段。</p>
+        <div id="story-fx-base" class="story-fx-layer"></div>
+        <div id="story-fx-upper" class="story-fx-layer"></div>
+
+        <div id="story-bubbles-layer" class="story-bubbles-layer">
+            <header id="story-header">
+                <div class="story-title"></div>
+                <div class="story-subtitle">轨迹 • He Loves You. The World Fears Him.</div>
+            </header>
+            <div id="character-sheet" class="character-sheet" aria-hidden="true">
+                <div class="sheet-inner">
+                    <button id="character-sheet-close" type="button">收合</button>
+                    <h3>角色档案 · 元书</h3>
+                    <p>身影固定在城市的霓虹下，习惯以低沉的宣告和缓慢的呼吸控制一切。如同黑雾的代理人，记得每一次心跳、每一条规则。</p>
+                    <p>喜好：靠近、降温、热牛奶、泡芙。<br>禁忌：被忽视、未经允许的逃离。</p>
+                    <p>提示：若他说“别浪费时间”，代表剧情正在推进到更危险的阶段。</p>
+                </div>
             </div>
+            <main id="story-log">
+                <!-- 之后由 JS 填充对话气泡 -->
+            </main>
         </div>
-        <main id="story-log">
-            <!-- 之后由 JS 填充对话气泡 -->
-        </main>
         <footer id="story-input-row">
             <button id="input-collapse-btn" class="hidden">⌄</button>
             <textarea id="story-input" rows="2" placeholder="在这里输入给元书的话…"></textarea>
@@ -431,6 +436,28 @@
     </div>
     <div id="phone-toggle-bubble">新消息</div>
 </button>
+
+<!-- 云朵简笔画预览（仅展示三种形状） -->
+<div id="cloud-demo-layer" aria-hidden="true">
+    <div class="cloud-demo cloud-a">
+        <div class="lump big1"></div>
+        <div class="lump big2"></div>
+        <div class="lump big3"></div>
+        <div class="lump small1"></div>
+        <div class="lump small2"></div>
+        <div class="lump small3"></div>
+    </div>
+    <div class="cloud-demo cloud-b">
+        <div class="lump big1"></div>
+        <div class="lump big2"></div>
+        <div class="lump small1"></div>
+    </div>
+    <div class="cloud-demo cloud-c">
+        <div class="lump big1"></div>
+        <div class="lump small1"></div>
+        <div class="lump small2"></div>
+    </div>
+</div>
 
 <script type="module" src="script.js"></script>
 </body>

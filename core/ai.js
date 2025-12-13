@@ -116,53 +116,65 @@ export async function askAI(userInput = "") {
 }
 
 export async function generateNarrativeReply(userInput) {
-    // ====== 本地测试版：用于验证气泡、字体、换行、关键词效果 ======
-    const demos = {
-        fog: `
-#N 黑雾在脚边盘绕，像是沿着墙根呼吸。远处的霓虹被噪点吞进深渊。
-#A 他抬手，雾像两层幕布被掀开，露出更暗的空洞。
-#D 别退。我在等你呼吸配合我。
-        `.trim(),
-        tentacle: `
-#N 天花板滴下静电，影子里有触手卷出，细的一根绕住窗把，粗的一根拍在地上，蠕动着探向你。
-#A 有一根半透明的触手从屏幕上方探下来，轻轻扫过气泡文字，像在测温。
-#D 抬脚。你让它试试，还是让它绕上来？
-        `.trim(),
-        gaze: `
-#N 捕食者的目光像聚焦光圈，锁在你喉结。他的规则被念出：不许后退，不许眨眼。
-#S 他每说一句，空气就压出一圈金线波纹，像心跳一样扩散又收紧。
-#D 念出你的心率。
-        `.trim(),
-        chaos: `
-#N 一枚像素化的花体字母从气泡里掉出来，在空中抖动，落地变成碎光。
-#A 你碰到它，屏幕弹出小游戏：在十五秒内点击四个符印，否则雾会把文字吞掉。
-#N 同时，右上角有个符号闪烁，点一下会溅出一串金红碎片，再次点会出现一条细触手绕圈后消失。
-#D 玩还是不玩？——他的声音带笑意。期待效果：触发 glitch 闪烁 + 许可光晕 + 触手覆在文字上方。
-        `.trim()
-    };
-
-    const picked = pickDemo(userInput, demos);
-    const demoText = picked || demos.gaze;
+    const samples = buildFxSamples();
+    const key = pickEffectKey(userInput, samples);
+    const demoText = samples[key] || samples.gaze;
 
     return {
         action: "reply_story",
-        payload: { 
+        payload: {
             text: demoText,
-            isAI: true,              // ⬅ 必须：告诉引擎这是 AI 回复
-            type: "story",           // ⬅ 必须：强制进入“故事剧情解析”管线
-            meta: { parsed: false }  // ⬅ 强制触发 parser，而不是原样输出
+            isAI: true,
+            type: "story",
+            meta: { parsed: false }
         }
     };
 }
 
-function pickDemo(userInput, demos) {
+function pickEffectKey(userInput, samples) {
     const text = (userInput || "").toLowerCase();
-    if (text.includes("tentacle") || text.includes("触手")) return demos.tentacle;
-    if (text.includes("fog") || text.includes("雾")) return demos.fog;
-    if (text.includes("gaze") || text.includes("凝视")) return demos.gaze;
-    if (text.includes("chaos") || text.includes("彩蛋") || text.includes("小游戏")) return demos.chaos;
-    const list = Object.values(demos);
-    return list[Math.floor(Math.random() * list.length)];
+    if (text.includes("触手") || text.includes("tentacle")) return "tentacle";
+    if (text.includes("雾") || text.includes("fog")) return "fog";
+    if (text.includes("凝视") || text.includes("gaze")) return "gaze";
+    if (text.includes("压暗") || text.includes("dim")) return "dim";
+    if (text.includes("跳") || text.includes("warp") || text.includes("jump")) return "jump";
+    if (text.includes("glitch") || text.includes("闪烁")) return "glitch";
+    if (text.includes("彩蛋") || text.includes("符印")) return "egg";
+    const keys = Object.keys(samples);
+    return keys[Math.floor(Math.random() * keys.length)];
+}
+
+function buildFxSamples() {
+    return {
+        fog: [
+            "#A 左侧雾气涌来，像云一样盖住地板，冷笑声压着它一起推进。",
+            "#N 空气冷了下来，云雾沿着左边推进，生气的气息藏在金粉里。"
+        ].join("\n"),
+        tentacle: [
+            "#A 触手从侧边伸出，蠕动着裹住文字。",
+            "#A 又一根触手卷住屏幕边缘，缠绕成环。"
+        ].join("\n"),
+        gaze: [
+            "#N 他的目光凝视着你，像在记录一条规则。",
+            "#D 盯着你，确认你记住。"
+        ].join("\n"),
+        dim: [
+            "#N 呼吸变慢，喉咙发紧，压迫感盖住声音。",
+            "#D 你意识到无法反驳，被迫停下。"
+        ].join("\n"),
+        jump: [
+            "#N 回廊里忽然出现烛火，像后室一样空房间在晃动（jump）。",
+            "#A 黄光划开空气，阵法的线条亮了一下，像是进入阵法。"
+        ].join("\n"),
+        glitch: [
+            "#N 忽然有点不对劲，时间像停了一下，画面微微 glitch。",
+            "#D 画面轻微闪烁，他脸红又羞涩地笑了下。"
+        ].join("\n"),
+        egg: [
+            "#N 屏幕上方掉落一颗彩蛋像素蛋，晃了一下才稳住。",
+            "#D 点一下彩蛋，可能掉出徽章，也可能只是发光。"
+        ].join("\n")
+    };
 }
 
 export async function generatePhoneMessage(chatId) {

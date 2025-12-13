@@ -1,8 +1,8 @@
 // Pixel asset hub: icons, bubble decos, and cloud sprites for fog.
 
 const ICON_SIZE = 22;
-const CLOUD_WIDTH = 44;
-const CLOUD_HEIGHT = 28;
+const CLOUD_WIDTH = 64;
+const CLOUD_HEIGHT = 36;
 
 const ICON_DRAWERS = {
     eye: drawEyeIcon,
@@ -18,14 +18,14 @@ const CLOUD_VARIANTS = [
 
 const CLOUD_PALETTES = {
     dark: {
-        fill: ["#0f0f22", "#1a1e39", "#252d5b", "#3b4a7f"],
-        edge: "rgba(104, 128, 180, 0.65)",
-        highlight: "rgba(164, 188, 255, 0.4)"
+        fill: ["#0c0d22", "#151a3a", "#23315e", "#394a82"],
+        edge: "rgba(104, 128, 180, 0.72)",
+        highlight: "rgba(174, 198, 255, 0.45)"
     },
     light: {
-        fill: ["#412018", "#b9675f", "#f6cba0", "#ffe3c0"],
-        edge: "rgba(255, 220, 180, 0.7)",
-        highlight: "rgba(255, 242, 210, 0.5)"
+        fill: ["#4a1f12", "#c66e34", "#f4c772", "#ffe7ba"],
+        edge: "rgba(255, 214, 170, 0.92)",
+        highlight: "rgba(255, 240, 210, 0.75)"
     }
 };
 
@@ -120,50 +120,53 @@ function drawCloudPuff(ctx, colors) {
     const grad = buildCloudGradient(ctx, colors);
     ctx.fillStyle = grad;
     const lumps = [
-        { x: 12, y: 18, rx: 11, ry: 7 },
-        { x: 22, y: 16, rx: 9, ry: 6 },
-        { x: 32, y: 18, rx: 10, ry: 7 },
-        { x: 18, y: 12, rx: 8, ry: 6 }
+        { x: 16, y: 22, rx: 14, ry: 9 },
+        { x: 30, y: 20, rx: 13, ry: 8 },
+        { x: 46, y: 22, rx: 14, ry: 9 },
+        { x: 24, y: 15, rx: 10, ry: 7 },
+        { x: 38, y: 14, rx: 9, ry: 6 }
     ];
     fillLumps(ctx, lumps);
     strokeCloud(ctx, lumps, colors.edge);
     addHighlights(ctx, colors.highlight, [
-        { x: 18, y: 14, rx: 4, ry: 2 },
-        { x: 28, y: 18, rx: 3, ry: 2 }
+        { x: 24, y: 17, rx: 5, ry: 3 },
+        { x: 40, y: 20, rx: 4, ry: 2.5 }
     ]);
 }
 
 function drawCloudStack(ctx, colors) {
-    const grad = buildCloudGradient(ctx, colors, 0.35, 0.9);
+    const grad = buildCloudGradient(ctx, colors, 0.3, 0.92);
     ctx.fillStyle = grad;
     const lumps = [
-        { x: 10, y: 16, rx: 10, ry: 6 },
-        { x: 21, y: 18, rx: 12, ry: 7 },
-        { x: 32, y: 16, rx: 8, ry: 5 },
-        { x: 24, y: 12, rx: 7, ry: 5 }
+        { x: 18, y: 22, rx: 14, ry: 8 },
+        { x: 32, y: 24, rx: 15, ry: 9 },
+        { x: 46, y: 22, rx: 13, ry: 8 },
+        { x: 28, y: 16, rx: 9, ry: 6 },
+        { x: 40, y: 14, rx: 8, ry: 5 }
     ];
     fillLumps(ctx, lumps);
     strokeCloud(ctx, lumps, colors.edge);
     addHighlights(ctx, colors.highlight, [
-        { x: 14, y: 15, rx: 3, ry: 2 },
-        { x: 27, y: 16, rx: 3, ry: 2 }
+        { x: 22, y: 18, rx: 4, ry: 2.5 },
+        { x: 36, y: 19, rx: 4, ry: 2.5 }
     ]);
 }
 
 function drawCloudLong(ctx, colors) {
-    const grad = buildCloudGradient(ctx, colors, 0.2, 0.8);
+    const grad = buildCloudGradient(ctx, colors, 0.2, 0.86);
     ctx.fillStyle = grad;
     const lumps = [
-        { x: 12, y: 18, rx: 10, ry: 6 },
-        { x: 22, y: 17, rx: 11, ry: 6 },
-        { x: 32, y: 16, rx: 10, ry: 5 },
-        { x: 18, y: 13, rx: 7, ry: 4 }
+        { x: 18, y: 22, rx: 13, ry: 7 },
+        { x: 30, y: 21, rx: 14, ry: 7 },
+        { x: 44, y: 20, rx: 13, ry: 7 },
+        { x: 26, y: 15, rx: 9, ry: 5 },
+        { x: 38, y: 14, rx: 8, ry: 5 }
     ];
     fillLumps(ctx, lumps);
     strokeCloud(ctx, lumps, colors.edge);
     addHighlights(ctx, colors.highlight, [
-        { x: 19, y: 14, rx: 3, ry: 2 },
-        { x: 30, y: 15, rx: 3, ry: 2 }
+        { x: 24, y: 17, rx: 4, ry: 2 },
+        { x: 36, y: 18, rx: 4, ry: 2 }
     ]);
 }
 
@@ -200,4 +203,123 @@ function addHighlights(ctx, color, highlights) {
         ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
         ctx.fill();
     });
+}
+
+// ---------- Prebaked pixel sprites for performance ----------
+// Build cloud sprite sheets (higher resolution to reduce pixelation when scaled)
+export function buildCloudSpriteSet() {
+    const paletteDark = { fill: "#5a6aa3" };
+    const paletteLight = { fill: "#ffe7c8" };
+    const variants = {
+        a: [
+            { x: 160, y: 198, rx: 114, ry: 71 },
+            { x: 316, y: 191, rx: 124, ry: 71 },
+            { x: 235, y: 101, rx: 77, ry: 47 },
+            { x: 74, y: 222, rx: 54, ry: 34 },
+            { x: 454, y: 235, rx: 54, ry: 34 },
+            { x: 336, y: 84, rx: 40, ry: 27 }
+        ],
+        b: [
+            { x: 132, y: 185, rx: 81, ry: 47 },
+            { x: 269, y: 178, rx: 74, ry: 44 },
+            { x: 198, y: 118, rx: 51, ry: 30 }
+        ],
+        c: [
+            { x: 185, y: 198, rx: 101, ry: 54 },
+            { x: 50, y: 211, rx: 40, ry: 24 },
+            { x: 378, y: 226, rx: 40, ry: 24 },
+            { x: 27, y: 171, rx: 26, ry: 16 },
+            { x: 415, y: 235, rx: 26, ry: 16 }
+        ]
+    };
+    return {
+        dark: bakeCloudSprites(paletteDark, variants),
+        light: bakeCloudSprites(paletteLight, variants)
+    };
+}
+
+function bakeCloudSprites(palette, variants) {
+    const cache = {};
+    ["a", "b", "c"].forEach((key, idx) => {
+        cache[idx] = createCloudSpriteCanvas(palette, variants[key]);
+    });
+    return cache;
+}
+
+function createCloudSpriteCanvas(palette, lumps) {
+    // Offscreen bake: draw once at base size, scale via canvas to reduce pixelation.
+    const SCALE = 6;
+    const baseW = 100;
+    const baseH = 70;
+    const canvas = document.createElement("canvas");
+    canvas.width = baseW * SCALE;
+    canvas.height = baseH * SCALE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return "";
+    ctx.imageSmoothingEnabled = true;
+    ctx.scale(SCALE, SCALE); // only scale here; never resize canvas later
+    ctx.fillStyle = palette.fill;
+    lumps.forEach(l => {
+        const x = l.x / SCALE;
+        const y = l.y / SCALE;
+        const rx = l.rx / SCALE;
+        const ry = l.ry / SCALE;
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    return canvas.toDataURL("image/png");
+}
+
+// Pixel egg sprites (3 variants) for richer Easter effects
+export function buildEggSpriteSet() {
+    const palettes = [
+        { fill: "#ffe6b8", accent: "#ff9ac0", badge: "#4a1e1e", shine: "#fff1d8" },
+        { fill: "#b7e6ff", accent: "#6ac8ff", badge: "#0f2d46", shine: "#e4f6ff" },
+        { fill: "#d6c2ff", accent: "#ff9ad6", badge: "#2e1846", shine: "#f1e6ff" }
+    ];
+    return palettes.map(p => createEggSprite(p));
+}
+
+function createEggSprite(palette) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 240;
+    canvas.height = 240;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return "";
+
+    // Egg body
+    ctx.fillStyle = palette.fill;
+    ctx.beginPath();
+    ctx.ellipse(120, 120, 78, 92, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Shine
+    ctx.fillStyle = palette.shine;
+    ctx.beginPath();
+    ctx.ellipse(84, 92, 28, 22, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Accent dots
+    ctx.fillStyle = palette.accent;
+    for (let i = 0; i < 16; i++) {
+        const angle = (Math.PI * 2 / 16) * i;
+        const r = 60 + Math.sin(i) * 8;
+        const x = 120 + Math.cos(angle) * r;
+        const y = 120 + Math.sin(angle) * r;
+        const rx = 7 + (i % 3);
+        const ry = 7 + ((i + 1) % 3);
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Badge glyph
+    ctx.fillStyle = palette.badge;
+    ctx.font = "bold 30px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("✶", 120, 132);
+
+    return canvas.toDataURL("image/png");
 }

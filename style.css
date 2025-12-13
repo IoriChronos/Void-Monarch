@@ -2137,70 +2137,83 @@ body.mobile-mode #app {
 
 #abyss-bg .abyss-tentacle {
     position: absolute;
-    bottom: -40px;
-    left: var(--tentacle-left, -10%);
-    width: calc(200px * var(--tentacle-thickness, 1));
-    height: calc(320px * var(--tentacle-scale, 1));
-    background-image: var(--tentacle-art);
-    background-size: contain;
-    background-repeat: no-repeat;
-    image-rendering: pixelated;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    --tentacle-length: 180px;
+    transform-origin: 0 0;
     filter:
         drop-shadow(0 0 12px rgba(0, 0, 0, 0.55))
         drop-shadow(0 0 16px rgba(124, 16, 37, 0.35));
     opacity: 0;
-    transform: translate(-6px, 24px) scale(var(--tentacle-scale, 1)) rotate(var(--tentacle-angle, -2deg));
-    transition: opacity 0.5s ease, transform 1s cubic-bezier(0.22, 1, 0.36, 1);
+    transform: translate(var(--tentacle-x, 0px), var(--tentacle-y, 0px)) rotate(var(--tentacle-angle, 0deg));
+    transition: none;
     z-index: 2;
-    animation:
-        tentacleEnter 0.65s ease-out forwards,
-        tentacleIdleSoft calc(2.6s * var(--tentacle-wiggle, 1)) ease-in-out 0.65s forwards,
-        tentacleRetreat 0.9s ease-in 3.25s forwards;
+    animation: tentacleSimple 2.6s ease-in-out forwards;
     animation-delay: var(--tentacle-delay, 0s);
     overflow: visible;
 }
 
 .abyss-tentacle.overlay {
-    top: -40px;
-    bottom: auto;
     opacity: 0.6;
     filter:
-        drop-shadow(0 0 18px rgba(255, 255, 255, 0.36))
-        drop-shadow(0 0 22px rgba(124, 16, 37, 0.46));
+        drop-shadow(0 0 12px rgba(0, 0, 0, 0.45))
+        drop-shadow(0 0 16px rgba(124, 16, 37, 0.35));
     mix-blend-mode: normal;
     z-index: 12;
 }
 .abyss-tentacles.upper .abyss-tentacle.overlay {
     opacity: 0.82;
     filter:
-        drop-shadow(0 0 24px rgba(124, 16, 37, 0.38))
-        drop-shadow(0 0 30px rgba(110, 90, 200, 0.35));
+        drop-shadow(0 0 12px rgba(0, 0, 0, 0.45))
+        drop-shadow(0 0 16px rgba(124, 16, 37, 0.35));
 }
 
 .abyss-tentacle.retreat {
     opacity: 0;
-    transform: translate(0, 40px) scale(calc(var(--tentacle-scale, 1) * 0.9)) rotate(3deg);
+    transform: translate(-50%, calc(-100% + var(--tentacle-rest-y, 6px) + 32px)) scale(calc(var(--tentacle-scale, 1) * 0.9)) rotate(calc(var(--tentacle-angle, -2deg) + 4deg));
 }
 
 .abyss-tentacle .tentacle-base {
     position: absolute;
-    bottom: -10px;
-    left: 45%;
-    width: 32px;
-    height: 32px;
+    left: 0;
+    top: 0;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
+    transform: translate(-50%, -50%);
     background:
-        radial-gradient(120% 120% at 40% 40%, rgba(255, 200, 220, 0.9), transparent 70%),
-        linear-gradient(180deg, rgba(200, 60, 80, 0.9), rgba(120, 20, 60, 0.7));
+        radial-gradient(120% 120% at 40% 40%, rgba(255, 190, 210, 0.95), transparent 70%),
+        linear-gradient(180deg, rgba(255, 140, 170, 0.95), rgba(230, 90, 130, 0.78));
     filter: drop-shadow(0 6px 12px rgba(0,0,0,0.35));
 }
 .abyss-tentacle .tentacle-body {
     position: absolute;
-    inset: 0;
-    background-image: var(--tentacle-art);
-    background-size: contain;
-    background-repeat: no-repeat;
-    image-rendering: pixelated;
+    left: 0;
+    top: 0;
+    width: 10px;
+    height: var(--tentacle-length, 180px);
+    transform: translate(-50%, calc(-1 * var(--tentacle-length, 180px)));
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(90, 16, 42, 0.9), rgba(140, 40, 70, 0.8));
+    box-shadow: inset 0 0 6px rgba(0,0,0,0.45);
+}
+.abyss-tentacle .tentacle-head {
+    position: absolute;
+    left: 0;
+    top: calc(-1 * var(--tentacle-length, 180px));
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background:
+        radial-gradient(120% 120% at 40% 40%, rgba(255, 255, 255, 0.95), transparent 70%),
+        linear-gradient(180deg, rgba(240, 240, 255, 0.95), rgba(210, 210, 230, 0.8));
+    box-shadow:
+        0 0 10px rgba(255, 255, 255, 0.7),
+        0 0 16px rgba(200, 200, 240, 0.4);
+    pointer-events: none;
 }
 
 @keyframes tentacleRise {
@@ -2210,18 +2223,11 @@ body.mobile-mode #app {
     100% { transform: translate(-6px, 6px) scale(1.02); opacity: 0; }
 }
 
-@keyframes tentacleEnter {
-    0% { opacity: 0; transform: translate(-6px, 38px) scale(var(--tentacle-scale, 1)) rotate(var(--tentacle-angle, -2deg)); }
-    100% { opacity: 1; transform: translate(-6px, 18px) scale(var(--tentacle-scale, 1)) rotate(var(--tentacle-angle, -2deg)); }
-}
-@keyframes tentacleIdleSoft {
-    0% { transform: translate(-6px, 18px) scale(var(--tentacle-scale, 1)) rotate(var(--tentacle-angle, -2deg)); opacity: 1; }
-    50% { transform: translate(-2px, 10px) scale(var(--tentacle-scale, 1)) rotate(calc(var(--tentacle-angle, -2deg) + 3deg)); opacity: 0.95; }
-    100% { transform: translate(-6px, 18px) scale(var(--tentacle-scale, 1)) rotate(calc(var(--tentacle-angle, -2deg) - 2deg)); opacity: 0.9; }
-}
-@keyframes tentacleRetreat {
-    0% { opacity: 1; transform: translate(-6px, 18px) scale(var(--tentacle-scale, 1)) rotate(var(--tentacle-angle, -2deg)); }
-    100% { opacity: 0; transform: translate(-6px, 44px) scale(calc(var(--tentacle-scale, 1) * 0.85)) rotate(calc(var(--tentacle-angle, -2deg) + 4deg)); }
+@keyframes tentacleSimple {
+    0% { opacity: 0; transform: translate(var(--tentacle-x, 0px), var(--tentacle-y, 0px)) rotate(var(--tentacle-angle, 0deg)) translateY(20px); }
+    20% { opacity: 1; transform: translate(var(--tentacle-x, 0px), var(--tentacle-y, 0px)) rotate(var(--tentacle-angle, 0deg)) translateY(0px); }
+    80% { opacity: 1; transform: translate(var(--tentacle-x, 0px), var(--tentacle-y, 0px)) rotate(var(--tentacle-angle, 0deg)) translateY(0px); }
+    100% { opacity: 0; transform: translate(var(--tentacle-x, 0px), var(--tentacle-y, 0px)) rotate(var(--tentacle-angle, 0deg)) translateY(20px); }
 }
 
 @keyframes tentacleSway {
