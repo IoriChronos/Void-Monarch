@@ -49,6 +49,8 @@ export function initAbyssBackground(panel = document.getElementById("story-panel
     eggFx.className = "abyss-egg";
     const permit = document.createElement("div");
     permit.className = "abyss-permission";
+    const tentacleGuide = document.createElement("div");
+    tentacleGuide.className = "tentacle-guide hidden";
     root.append(ambientFog, ambientFogGhost, layer1, layer2, layer3, fogBack, tentacleLayer, fogFront, wave, gaze, dim, glitch, warp, jump, permit);
 
     const baseFogLayer = document.createElement("div");
@@ -62,6 +64,7 @@ export function initAbyssBackground(panel = document.getElementById("story-panel
     baseLayer.appendChild(baseFogLayer);
     upperLayer.appendChild(upperFogLayer);
     upperLayer.appendChild(upperTentacleLayer);
+    upperLayer.appendChild(tentacleGuide);
     upperLayer.appendChild(eggFx);
 
     const engine = createAbyssEngine(panel, root, [layer1, layer2, layer3], {
@@ -69,7 +72,8 @@ export function initAbyssBackground(panel = document.getElementById("story-panel
         upperLayer,
         baseFogLayer,
         upperFogLayer,
-        upperTentacleLayer
+        upperTentacleLayer,
+        tentacleGuide
     });
     panel.__abyssBg = engine;
     return engine;
@@ -81,7 +85,8 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
         upperLayer = panel,
         baseFogLayer = baseLayer,
         upperFogLayer = upperLayer,
-        upperTentacleLayer = null
+        upperTentacleLayer = null,
+        tentacleGuide = null
     } = layers;
     const [fogCanvas, sparkCanvas, pulseCanvas] = canvases;
     const fogCtx = fogCanvas.getContext("2d");
@@ -98,6 +103,7 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
     const jump = root.querySelector(".abyss-jump");
     const eggFx = upperLayer.querySelector(".abyss-egg") || root.querySelector(".abyss-egg");
     const permit = root.querySelector(".abyss-permission");
+    const guide = upperLayer.querySelector(".tentacle-guide") || tentacleGuide;
     let width = 0;
     let height = 0;
 
@@ -108,8 +114,6 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
     let fogTimer = null;
     let waveTimer = null;
     let gazeTimer = null;
-    let tentacleCountBase = 0;
-    let tentacleCountOverlay = 0;
     let dimTimer = null;
     let glitchTimer = null;
     let warpTimer = null;
@@ -172,48 +176,63 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
                 count = 1,
                 speed = 1,
                 thickness = 1,
-                layer = "base"
+                layer = "auto",
+                debug = false
             } = options;
             if (!tentacleLayer) return;
 
-            const spawnCount = Math.max(1, Math.min(2, Math.round(count)));
+            const spawnCount = 1; // 限制一次只出一根
             for (let i = 0; i < spawnCount; i++) {
-                const wantOverlay = layer === "top" || layer === "overlay";
-                const targetLayer = wantOverlay && upperTentacleLayer ? upperTentacleLayer : tentacleLayer;
+                const targetLayer = tentacleLayer;
                 if (!targetLayer) continue;
-                if (wantOverlay) {
-                    if (tentacleCountOverlay >= 1) continue;
-                    tentacleCountOverlay++;
-                } else {
-                    if (tentacleCountBase >= 1) continue;
-                    tentacleCountBase++;
-                }
 
                 const spawn = pickSpawnPoint(width, height);
                 const angle = computeTentacleAngle(spawn, width, height);
+
                 const t = document.createElement("div");
                 t.className = "abyss-tentacle";
-                if (wantOverlay) t.classList.add("overlay");
+                if (debug) t.classList.add("debug");
                 t.dataset.edge = spawn.edge || "inner";
                 const base = document.createElement("div");
                 base.className = "tentacle-base";
+                const core = document.createElement("div");
+                core.className = "tentacle-core";
                 const body = document.createElement("div");
                 body.className = "tentacle-body";
                 const head = document.createElement("div");
                 head.className = "tentacle-head";
-                t.append(base, body, head);
+
+                // 颜色变体：底层也有蓝紫高层感
+                const paletteChance = Math.random();
+                if (paletteChance < 0.45) {
+                    body.style.setProperty("--tentacle-art", "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='128' shape-rendering='crispEdges'><rect width='96' height='128' fill='none'/><path fill='%23060a14' d='M18 120h14v8H18z'/><path fill='%230c1124' d='M22 100h14v28H22z'/><path fill='%2314253f' d='M30 66h12v64H30z'/><path fill='%2320365a' d='M40 42h12v94H40z'/><path fill='%23314b78' d='M48 30h12v90H48z'/><path fill='%2343629b' d='M56 26h10v72H56z'/><path fill='%235c7cc0' d='M60 24h10v48H60z'/><path fill='%2382a5e8' d='M64 20h8v36h-8z'/><path fill='%23b7d2ff' d='M68 18h6v18h-6z'/></svg>\")");
+                }
+                core.append(body, head);
+                t.append(base, core);
+
+                // 随机动画：轻摇 / 软弯 / 深弯 / 触碰
+                const animPick = Math.random();
+                if (animPick < 0.35) {
+                    core.classList.add("anim-sway");
+                } else if (animPick < 0.65) {
+                    core.classList.add("anim-curl-soft");
+                } else if (animPick < 0.9) {
+                    core.classList.add("anim-curl-deep");
+                } else {
+                    core.classList.add("anim-touch");
+                }
 
                 t.style.setProperty("--tentacle-x", `${spawn.x.toFixed(1)}px`);
                 t.style.setProperty("--tentacle-y", `${spawn.y.toFixed(1)}px`);
-                t.style.setProperty("--tentacle-angle", `${angle.toFixed(1)}deg`);
+                t.style.setProperty("--tentacle-angle", `${angle}deg`);
 
-                const scale = 0.9 + Math.random() * 0.5;
-                const wiggle = (0.9 + Math.random() * 0.5) * speed;
-                const delay = Math.random() * 0.4;
-                const thicknessScale = 0.8 + Math.random() * 0.5 * thickness;
-                const enterDur = 0.95 + Math.random() * 0.25;
-                const idleDur = (1.4 + Math.random() * 0.8) / Math.max(0.45, speed);
-                const retreatDur = 1.05 + Math.random() * 0.2;
+                const scale = 1; // 固定尺寸，避免缩放带来位移偏差
+                const wiggle = (0.9 + Math.random() * 0.3) * speed;   // 调整：轻微摆幅
+                const delay = Math.random() * 0.25;                   // 调整：起始延迟
+                const thicknessScale = 1 * thickness;                 // 调整：粗细缩放
+                const enterDur = 1 + Math.random() * 0.3;             // 调整：入场时长 1.0~1.3s
+                const idleDur = 2.6 + Math.random() * 1.6;            // 调整：停留时长 2.6~4.2s
+                const retreatDur = 0.9 + Math.random() * 0.6;         // 调整：退场时长 0.9~1.5s
 
                 t.style.setProperty("--tentacle-scale", scale.toFixed(2));
                 t.style.setProperty("--tentacle-wiggle", wiggle.toFixed(2));
@@ -233,11 +252,6 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
                     if (cleaned) return;
                     cleaned = true;
                     t.remove();
-                    if (wantOverlay) {
-                        tentacleCountOverlay = Math.max(0, tentacleCountOverlay - 1);
-                    } else {
-                        tentacleCountBase = Math.max(0, tentacleCountBase - 1);
-                    }
                 };
 
                 const retreatTimer = setTimeout(() => {
@@ -319,6 +333,23 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
             permit.classList.add("permit-on");
             clearTimeout(permitTimer);
             permitTimer = setTimeout(() => permit.classList.remove("permit-on"), 1800);
+        },
+        summonHighTentacleBall({ x = null, y = null } = {}) {
+            if (!upperTentacleLayer) return;
+            const rect = panel.getBoundingClientRect();
+            const cx = rect.width / 2;
+            const cy = rect.height / 2;
+            const node = document.createElement("div");
+            node.className = "high-tentacle-ball";
+            node.style.left = `${x ?? cx}px`;
+            node.style.top = `${y ?? cy}px`;
+            upperTentacleLayer.appendChild(node);
+            setTimeout(() => node.remove(), 4200);
+        },
+        showTentacleGuide(show = true) {
+            if (!guide) return;
+            guide.classList.toggle("hidden", !show);
+            if (show) renderTentacleGuide();
         },
         showSigil() {},
         destroy() {
@@ -406,33 +437,106 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
     }
 
     function pickSpawnPoint(w, h) {
-        const edges = ["left", "right", "top", "bottom"];
-        const edge = pick(edges);
-        const bandX = { min: w * 0.3, max: w * 0.7 }; // 中点±40% → 30%~70%
-        const bandY = { min: h * 0.3, max: h * 0.7 };
-        if (edge === "left") {
-            const y = clamp(bandY.min + Math.random() * (bandY.max - bandY.min), 0, h);
-            return { edge, x: 0, y };
-        }
-        if (edge === "right") {
-            const y = clamp(bandY.min + Math.random() * (bandY.max - bandY.min), 0, h);
-            return { edge, x: w, y };
-        }
-        if (edge === "top") {
+        const bandX = { min: w * 0.3, max: w * 0.7 }; // 调整：中段范围（左右）
+        const bandY = { min: h * 0.3, max: h * 0.7 }; // 调整：中段范围（上下）
+
+        const slots = [
+            { edge: "left", type: "mid" },
+            { edge: "right", type: "mid" },
+            { edge: "top", type: "mid" },
+            { edge: "bottom", type: "mid" },
+            { corner: "lt" },
+            { corner: "rt" },
+            { corner: "lb" },
+            { corner: "rb" }
+        ];
+        const slot = pick(slots);
+
+        const jitter = {
+            leftX: randRange(-40, 20),    // 调整：左侧水平偏移
+            rightX: randRange(-20, 40),   // 调整：右侧水平偏移
+            topY: randRange(-40, 20),     // 调整：顶部垂直偏移
+            bottomY: randRange(-20, 40)   // 调整：底部垂直偏移（基准 h+120 见下）
+        };
+
+        if (slot.type === "mid") {
+            if (slot.edge === "left") {
+                const y = clamp(bandY.min + Math.random() * (bandY.max - bandY.min), 0, h);
+                const x = jitter.leftX;
+                return { edge: "left", x, y };
+            }
+            if (slot.edge === "right") {
+                const y = clamp(bandY.min + Math.random() * (bandY.max - bandY.min), 0, h);
+                const x = w + jitter.rightX;
+                return { edge: "right", x, y };
+            }
+            if (slot.edge === "top") {
+                const x = clamp(bandX.min + Math.random() * (bandX.max - bandX.min), 0, w);
+                const y = jitter.topY;
+                return { edge: "top", x, y };
+            }
             const x = clamp(bandX.min + Math.random() * (bandX.max - bandX.min), 0, w);
-            return { edge, x, y: 0 };
+            const y = h + jitter.bottomY;
+            return { edge: "bottom", x, y };
         }
-        // bottom
-        const x = clamp(bandX.min + Math.random() * (bandX.max - bandX.min), 0, w);
-        return { edge: "bottom", x, y: h };
+
+        // 角落：落在边角区域，同时加入对应方向的偏移
+        if (slot.corner === "lt") {
+            const x = jitter.leftX;
+            const y = jitter.topY;
+            return { edge: "corner", corner: "lt", x, y };
+        }
+        if (slot.corner === "rt") {
+            const x = w + jitter.rightX;
+            const y = jitter.topY;
+            return { edge: "corner", corner: "rt", x, y };
+        }
+        if (slot.corner === "lb") {
+            const x = jitter.leftX;
+            const y = h + 120 + jitter.bottomY;
+            return { edge: "corner", corner: "lb", x, y };
+        }
+        const x = w + jitter.rightX;
+        const y = h + 120 + jitter.bottomY;
+        return { edge: "corner", corner: "rb", x, y };
     }
 
     function computeTentacleAngle(spawn, w, h) {
         if (!spawn.edge) return 0;
-        if (spawn.edge === "left") return 90;
-        if (spawn.edge === "right") return -90;
-        if (spawn.edge === "top") return 180;
-        return 0; // bottom
+        if (spawn.edge === "corner") {
+            const cornerJitter = randRange(-10, 10);
+            if (spawn.corner === "lt") return 135 + cornerJitter;
+            if (spawn.corner === "rt") return -135 + cornerJitter;
+            if (spawn.corner === "lb") return 45 + cornerJitter;
+            return -45 + cornerJitter; // rb
+        }
+        const jitter = randRange(-30, 30); // 调整：中段角度随机幅度
+        if (spawn.edge === "left") return 90 + jitter;
+        if (spawn.edge === "right") return -90 + jitter;
+        if (spawn.edge === "top") return 180 + jitter;
+        return 0 + jitter; // bottom
+    }
+
+    function renderTentacleGuide() {
+        if (!guide) return;
+        guide.innerHTML = "";
+        const inner = document.createElement("div");
+        inner.className = "guide-inner";
+        const sprite = document.createElement("div");
+        sprite.className = "guide-sprite";
+        const base = document.createElement("div");
+        base.className = "guide-base";
+        const head = document.createElement("div");
+        head.className = "guide-head";
+        const skeleton = document.createElement("div");
+        skeleton.className = "guide-skeleton";
+        const jointTop = document.createElement("div");
+        jointTop.className = "guide-joint top";
+        const jointBottom = document.createElement("div");
+        jointBottom.className = "guide-joint bottom";
+        skeleton.append(jointTop, jointBottom);
+        inner.append(sprite, base, head, skeleton);
+        guide.appendChild(inner);
     }
 
     function spawnJumpPixels() {
@@ -692,6 +796,10 @@ function wrapParticle(p, width, height) {
 
 function pick(list) {
     return list[Math.floor(Math.random() * list.length)];
+}
+
+function randRange(min, max) {
+    return min + Math.random() * (max - min);
 }
 
 function clamp(v, min, max) {

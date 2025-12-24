@@ -2045,9 +2045,31 @@ body.mobile-mode #app {
     inset: 0;
     pointer-events: none;
     overflow: visible;
-    mask-image: linear-gradient(180deg, #fff 0%, #fff 74%, transparent 100%);
-    -webkit-mask-image: linear-gradient(180deg, #fff 0%, #fff 74%, transparent 100%);
+    mask-image: linear-gradient(180deg, #fff 0%, #fff 82%, transparent 100%);
+    -webkit-mask-image: linear-gradient(180deg, #fff 0%, #fff 82%, transparent 100%);
     z-index: 6;
+}
+.high-tentacle-ball {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, rgba(190, 220, 255, 0.95), rgba(90, 130, 255, 0.75));
+    box-shadow:
+        0 0 20px rgba(120, 160, 255, 0.8),
+        0 0 36px rgba(90, 130, 255, 0.5);
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+    animation: highTentacleBall 4s ease-in-out forwards;
+    pointer-events: none;
+    z-index: 14;
+}
+
+@keyframes highTentacleBall {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+    20% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+    70% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -40%) scale(0.8); }
 }
 
 #abyss-bg .abyss-fog {
@@ -2137,17 +2159,27 @@ body.mobile-mode #app {
 
 #abyss-bg .abyss-tentacle {
     position: absolute;
-    left: var(--tentacle-x, 0px);
-    top: var(--tentacle-y, 0px);
-    width: 160px;
-    height: 220px;
-    --tentacle-length: 180px;
-    transform-origin: 50% 100%;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    --tentacle-length: 180px;              /* 调整长度基准 */
+    --tentacle-length-scale: 1.9;          /* 调整长度缩放 */
+    --tentacle-length-abs: calc(var(--tentacle-length) * var(--tentacle-length-scale));
+    --tentacle-width: 96px;                /* 调整宽度基准 */
+    --tentacle-width-scale: 1.9;           /* 调整宽度缩放 */
+    --tentacle-width-abs: calc(var(--tentacle-width) * var(--tentacle-width-scale));
+    --tentacle-base-size: 30px;
+    --tentacle-head-size: 14px;
+    --tentacle-body-offset-x: -50%;
+    --tentacle-body-offset-y: 0px;         /* 调整身体上移，负值向上 */
+    --tentacle-head-offset: -6px;          /* 调整头部上移，负值向上 */
+    transform-origin: 0 0;
     filter:
         drop-shadow(0 0 12px rgba(0, 0, 0, 0.55))
         drop-shadow(0 0 16px rgba(124, 16, 37, 0.35));
     opacity: 0;
-    transform: translate(-50%, 0px) rotate(var(--tentacle-angle, 0deg)) translateY(18px);
+    transform: translate(var(--tentacle-x, 0px), var(--tentacle-y, 0px));
     transition: none;
     z-index: 2;
     animation: tentacleSimple 2.6s ease-in-out forwards;
@@ -2155,58 +2187,85 @@ body.mobile-mode #app {
     overflow: visible;
 }
 
+.abyss-tentacle .tentacle-core {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 50% 100%;
+    transform: rotate(var(--tentacle-angle, 0deg));
+}
+.abyss-tentacle .tentacle-core.anim-sway {
+    animation: tentacleSwayLite 4.2s ease-in-out infinite; /* 调整摇摆幅度/时间：见 keyframes */
+}
+.abyss-tentacle .tentacle-core.anim-curl-soft {
+    animation: tentacleCurlSoft 3.6s ease-in-out infinite; /* 调整软弯幅度/时间：见 keyframes */
+}
+.abyss-tentacle .tentacle-core.anim-curl-deep {
+    animation: tentacleCurlDeep 3.4s ease-in-out infinite; /* 调整深弯幅度/时间：见 keyframes */
+}
+.abyss-tentacle .tentacle-core.anim-touch {
+    animation: tentacleTouch 3s ease-in-out infinite; /* 调整触碰幅度/时间：见 keyframes */
+}
+
 .abyss-tentacle.overlay {
     opacity: 0.6;
     filter:
-        drop-shadow(0 0 12px rgba(0, 0, 0, 0.45))
-        drop-shadow(0 0 16px rgba(124, 16, 37, 0.35));
-    mix-blend-mode: normal;
+        drop-shadow(0 0 18px rgba(100, 140, 255, 0.45))
+        drop-shadow(0 0 22px rgba(120, 160, 255, 0.5));
+    mix-blend-mode: screen;
     z-index: 12;
 }
 .abyss-tentacles.upper .abyss-tentacle.overlay {
     opacity: 0.82;
     filter:
-        drop-shadow(0 0 12px rgba(0, 0, 0, 0.45))
-        drop-shadow(0 0 16px rgba(124, 16, 37, 0.35));
+        drop-shadow(0 0 18px rgba(100, 140, 255, 0.45))
+        drop-shadow(0 0 26px rgba(140, 170, 255, 0.48));
+}
+.abyss-tentacle.overlay .tentacle-body {
+    filter: hue-rotate(210deg) saturate(1.15) brightness(0.95);
 }
 
 .abyss-tentacle.retreat {
     opacity: 0;
-    transform: translate(-50%, calc(-100% + var(--tentacle-rest-y, 6px) + 32px)) scale(calc(var(--tentacle-scale, 1) * 0.9)) rotate(calc(var(--tentacle-angle, -2deg) + 4deg));
+    transform: translate(var(--tentacle-x, 0px), var(--tentacle-y, 0px)) translateY(20px);
 }
 
 .abyss-tentacle .tentacle-base {
     position: absolute;
-    bottom: -10px;
     left: 50%;
-    width: 30px;
-    height: 30px;
+    top: 0;
+    width: var(--tentacle-base-size);
+    height: var(--tentacle-base-size);
     border-radius: 50%;
     background:
         radial-gradient(120% 120% at 40% 40%, rgba(255, 190, 210, 0.95), transparent 70%),
         linear-gradient(180deg, rgba(255, 140, 170, 0.95), rgba(230, 90, 130, 0.78));
     filter: drop-shadow(0 6px 12px rgba(0,0,0,0.35));
-    transform: translateX(-50%);
+    transform: translate(-50%, 0);
+    opacity: 0;
 }
 .abyss-tentacle .tentacle-body {
     position: absolute;
     left: 50%;
     bottom: 0;
-    width: 10px;
-    height: var(--tentacle-length, 180px);
-    transform: translateX(-50%);
-    border-radius: 8px;
-    background: linear-gradient(180deg, rgba(90, 16, 42, 0.9), rgba(140, 40, 70, 0.8));
-    box-shadow: inset 0 0 6px rgba(0,0,0,0.45);
+    width: var(--tentacle-width-abs);
+    height: var(--tentacle-length-abs);
+    transform: translate(-50%, 0);
+    background-image: var(--tentacle-art);
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center bottom;
+    image-rendering: pixelated;
 }
 .abyss-tentacle .tentacle-head {
     position: absolute;
-    bottom: var(--tentacle-length, 180px);
     left: 50%;
-    width: 14px;
-    height: 14px;
+    bottom: calc(var(--tentacle-length-abs) + var(--tentacle-head-offset));
+    width: var(--tentacle-head-size);
+    height: var(--tentacle-head-size);
     border-radius: 50%;
     transform: translate(-50%, 0);
+    opacity: 0;
     background:
         radial-gradient(120% 120% at 40% 40%, rgba(255, 255, 255, 0.95), transparent 70%),
         linear-gradient(180deg, rgba(240, 240, 255, 0.95), rgba(210, 210, 230, 0.8));
@@ -2214,6 +2273,124 @@ body.mobile-mode #app {
         0 0 10px rgba(255, 255, 255, 0.7),
         0 0 16px rgba(200, 200, 240, 0.4);
     pointer-events: none;
+}
+
+.abyss-tentacle.debug {
+    outline: 1px dashed rgba(255, 255, 255, 0.25);
+}
+.abyss-tentacle.debug .tentacle-core {
+    outline: 1px solid rgba(0, 255, 255, 0.4);
+}
+.abyss-tentacle.debug .tentacle-body {
+    outline: 1px solid rgba(0, 200, 255, 0.6);
+    background-color: rgba(0, 200, 255, 0.1);
+}
+.abyss-tentacle.debug .tentacle-base {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+}
+.abyss-tentacle.debug .tentacle-head {
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.8),
+        0 0 10px rgba(255, 255, 255, 0.7);
+}
+
+.tentacle-guide {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    width: 140px;
+    height: 240px;
+    pointer-events: none;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.tentacle-guide.hidden {
+    display: none;
+}
+.tentacle-guide .guide-inner {
+    position: relative;
+    width: 120px;
+    height: 220px;
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    --tentacle-length: 180px;
+    --tentacle-length-scale: 1.9;
+    --tentacle-length-abs: calc(var(--tentacle-length) * var(--tentacle-length-scale));
+    --tentacle-width: 96px;
+    --tentacle-width-scale: 1.9;
+    --tentacle-width-abs: calc(var(--tentacle-width) * var(--tentacle-width-scale));
+    --tentacle-base-size: 30px;
+    --tentacle-head-size: 14px;
+}
+.tentacle-guide .guide-sprite {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: var(--tentacle-width-abs);
+    height: var(--tentacle-length-abs);
+    transform: translate(-50%, 0);
+    background-image: var(--tentacle-art);
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center bottom;
+    image-rendering: pixelated;
+    opacity: 0.85;
+}
+.tentacle-guide .guide-base {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: var(--tentacle-base-size);
+    height: var(--tentacle-base-size);
+    border-radius: 50%;
+    transform: translate(-50%, 50%);
+    background:
+        radial-gradient(120% 120% at 40% 40%, rgba(255, 190, 210, 0.95), transparent 70%),
+        linear-gradient(180deg, rgba(255, 140, 170, 0.95), rgba(230, 90, 130, 0.78));
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.35);
+}
+.tentacle-guide .guide-head {
+    position: absolute;
+    left: 50%;
+    bottom: var(--tentacle-length-abs);
+    width: var(--tentacle-head-size);
+    height: var(--tentacle-head-size);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background:
+        radial-gradient(120% 120% at 40% 40%, rgba(255, 255, 255, 0.95), transparent 70%),
+        linear-gradient(180deg, rgba(240, 240, 255, 0.95), rgba(210, 210, 230, 0.8));
+    box-shadow:
+        0 0 10px rgba(255, 255, 255, 0.7),
+        0 0 16px rgba(200, 200, 240, 0.4);
+}
+.tentacle-guide .guide-skeleton {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 2px;
+    height: 180px;
+    transform: translate(-50%, 0);
+    background: rgba(0, 255, 255, 0.35);
+}
+.tentacle-guide .guide-joint {
+    position: absolute;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 255, 255, 0.8);
+    box-shadow: 0 0 6px rgba(0, 255, 255, 0.5);
+}
+.tentacle-guide .guide-joint.top {
+    top: 0;
+}
+.tentacle-guide .guide-joint.bottom {
+    bottom: 0;
 }
 
 @keyframes tentacleRise {
@@ -2224,18 +2401,37 @@ body.mobile-mode #app {
 }
 
 @keyframes tentacleSimple {
-    0% { opacity: 0; transform: translate(-50%, 18px) rotate(var(--tentacle-angle, 0deg)) translateY(16px); }
-    20% { opacity: 1; transform: translate(-50%, 0px) rotate(var(--tentacle-angle, 0deg)) translateY(0px); }
-    80% { opacity: 1; transform: translate(-50%, 0px) rotate(var(--tentacle-angle, 0deg)) translateY(0px); }
-    100% { opacity: 0; transform: translate(-50%, 18px) rotate(var(--tentacle-angle, 0deg)) translateY(12px); }
+    0% { opacity: 0; transform: translate(var(--tentacle-x, 0px), var(--tentacle-y, 0px)); }
+    20% { opacity: 1; transform: translate(var(--tentacle-x, 0px), var(--tentacle-y, 0px)); }
+    80% { opacity: 1; transform: translate(var(--tentacle-x, 0px), var(--tentacle-y, 0px)); }
+    100% { opacity: 0; transform: translate(var(--tentacle-x, 0px), var(--tentacle-y, 0px)); }
 }
 
-@keyframes tentacleSway {
-    0% { opacity: 0; transform: translate(-8px, 28px) scale(var(--tentacle-scale, 1)) rotate(-2deg); }
-    20% { opacity: 0.88; transform: translate(-2px, 2px) scale(calc(var(--tentacle-scale, 1) * 1.04)) rotate(-4deg); }
-    50% { opacity: 0.72; transform: translate(4px, -12px) scale(calc(var(--tentacle-scale, 1) * 1.02)) rotate(1deg); }
-    80% { opacity: 0.8; transform: translate(-6px, 0px) scale(var(--tentacle-scale, 1)) rotate(-2deg); }
-    100% { opacity: 0; transform: translate(-6px, 18px) scale(calc(var(--tentacle-scale, 1) * 0.94)) rotate(4deg); }
+@keyframes tentacleSwayLite {
+    0% { transform: rotate(calc(var(--tentacle-angle, 0deg) - 2deg)) translateY(0); }
+    50% { transform: rotate(calc(var(--tentacle-angle, 0deg) + 2.5deg)) translateY(-2px); }
+    100% { transform: rotate(calc(var(--tentacle-angle, 0deg) - 1deg)) translateY(0); }
+}
+
+@keyframes tentacleCurlSoft {
+    0% { transform: rotate(calc(var(--tentacle-angle, 0deg) - 2deg)) scaleY(1); }
+    35% { transform: rotate(calc(var(--tentacle-angle, 0deg) + 4deg)) scaleY(0.9); }
+    60% { transform: rotate(calc(var(--tentacle-angle, 0deg) + 6deg)) scaleY(0.86) translateY(-4px); }
+    100% { transform: rotate(calc(var(--tentacle-angle, 0deg) - 1deg)) scaleY(1); }
+}
+
+@keyframes tentacleCurlDeep {
+    0% { transform: rotate(calc(var(--tentacle-angle, 0deg) - 4deg)) scaleY(1); }
+    30% { transform: rotate(calc(var(--tentacle-angle, 0deg) + 8deg)) scaleY(0.84) translateY(-6px); }
+    60% { transform: rotate(calc(var(--tentacle-angle, 0deg) + 10deg)) scaleY(0.8) translateY(-8px); }
+    100% { transform: rotate(calc(var(--tentacle-angle, 0deg) - 2deg)) scaleY(1); }
+}
+
+@keyframes tentacleTouch {
+    0% { transform: rotate(calc(var(--tentacle-angle, 0deg))) translateY(0); }
+    25% { transform: rotate(calc(var(--tentacle-angle, 0deg) + 3deg)) translateY(-6px) scaleY(0.92); }
+    55% { transform: rotate(calc(var(--tentacle-angle, 0deg) + 1deg)) translateY(-2px) scaleY(0.96); }
+    100% { transform: rotate(calc(var(--tentacle-angle, 0deg))) translateY(0) scaleY(1); }
 }
 
 #abyss-bg .abyss-pressure-wave {

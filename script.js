@@ -37,7 +37,7 @@ const abyssCooldown = {
 };
 const ABYSS_MIN_INTERVAL = {
     fog: 4500,
-    tentacle: 3000,
+    tentacle: 1000, // 触手触发冷却改为 1s
     wave: 5200,
     gaze: 5200
 };
