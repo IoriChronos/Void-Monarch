@@ -5,7 +5,11 @@ const GROQ_PROVIDER = {
     apiBase: "https://api.groq.com/openai/v1/chat/completions",
     PRIMARY_STORY_MODEL: "llama3-70b-8192",
     CHEAP_SUMMARIZER_MODEL: "gemma2-9b-it",
-    ROUTER_MODEL: "llama3-8b-8192"
+    ROUTER_MODEL: "llama3-8b-8192",
+    PHONE_MODEL: "llama3-8b-8192",
+    storyModel: "llama3-70b-8192",
+    memoryModel: "gemma2-9b-it",
+    phoneModel: "llama3-8b-8192"
 };
 
 export const AI_PROVIDERS = [
@@ -17,6 +21,10 @@ export const AI_CONFIG = {
     PRIMARY_STORY_MODEL: GROQ_PROVIDER.PRIMARY_STORY_MODEL,
     CHEAP_SUMMARIZER_MODEL: GROQ_PROVIDER.CHEAP_SUMMARIZER_MODEL,
     ROUTER_MODEL: GROQ_PROVIDER.ROUTER_MODEL,
+    PHONE_MODEL: GROQ_PROVIDER.PHONE_MODEL,
+    storyModel: GROQ_PROVIDER.storyModel,
+    memoryModel: GROQ_PROVIDER.memoryModel,
+    phoneModel: GROQ_PROVIDER.phoneModel,
     systemPrompt: `你是元书，恶念形成的黑雾。
 永远根据 GameState（用户本地存储的记忆状态）进行推理。
 禁止虚构不存在的剧情。

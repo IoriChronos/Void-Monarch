@@ -7,13 +7,16 @@ import {
     getLongMemoryContextLimit
 } from "../data/memory-long.js";
 import { buildSystemPrompt } from "../data/system-rules.js";
+import { getActiveCard } from "../data/character-cards.js";
+import { getPersonaMemory } from "../data/memory-persona.js";
 
 const PROVIDER_STORAGE_KEY = "yuan-phone:ai-provider";
 const TASK_MODEL_MAP = {
-    story: "PRIMARY_STORY_MODEL",
-    summarize: "CHEAP_SUMMARIZER_MODEL",
+    story: "storyModel",
+    summarize: "memoryModel",
     classify: "ROUTER_MODEL",
-    "tool-plan": "ROUTER_MODEL"
+    "tool-plan": "ROUTER_MODEL",
+    phone: "phoneModel"
 };
 
 let activeProviderId = loadActiveProviderId();
@@ -64,7 +67,10 @@ export function setActiveProvider(id) {
 export async function callModel(task = "story", { messages = [], maxTokens } = {}) {
     const provider = resolveProvider();
     const modelKey = TASK_MODEL_MAP[task] || TASK_MODEL_MAP.story;
-    const modelName = provider[modelKey] || AI_CONFIG[modelKey];
+    const modelName = provider[modelKey]
+        || provider.PRIMARY_STORY_MODEL
+        || AI_CONFIG[modelKey]
+        || AI_CONFIG.PRIMARY_STORY_MODEL;
     if (!modelName) {
         throw new Error(`Missing model for task ${task}`);
     }
@@ -235,11 +241,14 @@ Kind: ${kind}`.trim();
 function buildContextDocument(userInput) {
     const { sections } = composeContext();
     const rules = buildSystemPrompt();
+    const card = getActiveCard();
     const parts = [
         rules ? `SYSTEM RULES:\n${rules}` : "",
+        `ROLE CARD：${card.name}\n- WORLD: ${card.worldLore || "未设定"}\n- PERSONA: ${card.persona || "未设定"}\n- FIXED: ${card.rules || "无"}\n- DYNAMIC: ${(card.dynamic || []).join(" | ") || "无"}`,
         `LONG MEMORY (${sections.longMemory.count} 条)：\n${sections.longMemory.text}`,
         `SHORT MEMORY · 剧情 (${sections.short.storyCount})：\n${sections.short.storyText}`,
         `SHORT MEMORY · 手机 (${sections.short.eventCount})：\n${sections.short.eventText}`,
+        sections.personaMemory ? `PERSONA MEMORY (${sections.personaMemory.count})：\n${sections.personaMemory.text}` : "",
         `WORLD SNAPSHOT：\n${sections.world}`,
         `CURRENT INPUT：\n${userInput || "……"}`
     ].filter(Boolean);
@@ -250,10 +259,12 @@ function composeContext() {
     const world = getWorldState();
     const shortMemory = normalizeShortMemory(getShortMemory());
     const longState = normalizeLongMemory(getLongMemory());
+    const persona = getPersonaMemory();
     const limit = getLongMemoryContextLimit();
     const longEpisodes = longState.slice(-limit);
     const storyLines = shortMemory.story.map(formatStoryMemory).join("\n") || "（空）";
     const eventLines = shortMemory.events.map(formatEventMemory).join("\n") || "（空）";
+    const personaLines = persona.map(p => `· ${p.text}`).join("\n") || "";
     const worldSnapshot = JSON.stringify({
         chats: world.chats.slice(0, 3).map(chat => ({
             id: chat.id,
@@ -282,7 +293,8 @@ function composeContext() {
                 eventCount: shortMemory.events.length,
                 eventText: eventLines
             },
-            world: worldSnapshot
+            world: worldSnapshot,
+            personaMemory: persona.length ? { count: persona.length, text: personaLines } : null
         }
     };
 }

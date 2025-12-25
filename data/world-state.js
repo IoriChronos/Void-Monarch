@@ -1,4 +1,5 @@
 import { addShortMemory, addShortEventMemory, hydrateShortMemory } from "./memory-short.js";
+import { getActiveCard, DEFAULT_OPENER, GENERIC_OPENER } from "./character-cards.js";
 
 const SYSTEM_VERSION = 2;
 const MARKER_TO_TYPE = {
@@ -74,60 +75,17 @@ const initialCallHistory = () => ([
     { name: "未知号码", time: "前天", note: "未接" }
 ]);
 
-const defaultStoryScript = `
-#N 主线从这里开始。夜班后的便利店只剩冰柜的嗡鸣，你靠在玻璃上听雨和远处的广播共享同一个频率。
+const GENERIC_OPENER_FALLBACK = GENERIC_OPENER || "这是默认开场白";
+const DEFAULT_OPENER_FALLBACK = DEFAULT_OPENER || GENERIC_OPENER_FALLBACK;
 
-#N 霓虹在积水里弯成失真的线，他的目光顺着玻璃门滑过，像在审视逃生口。
-
-#A 他走近时让冷气先碰到你，指节扫过肩胛，低声命令：“贴着门站好。”
-
-#T “我觉得他又在记录我的心跳。”
-
-#N 你手里的热牛奶被他毫不客气地拿走，糖味与他衣领上的雨声混成静电味的拥抱。
-
-#A **他的掌心扣住**你握杯的手，沿着脉搏慢慢上移：“提前告诉我你的行程。”
-
-#D 靠近一点，别浪费时间。
-
-#N 后室一样的走廊突然亮灯，噪点沿墙蔓延，他像管理员一样站在唯一出口。
-
-#T “如果他一直跟着我，是不是就安全了？”
-
-#D 别动。我在看你。
-
-#S 【通知】守望：摄像头延迟 0.8 秒，系统正在补录。
-`.trim();
-
-const defaultStory = seedDefaultStory();
-
-function seedDefaultStory() {
-    const baseTime = Date.now();
-    const entries = [];
-    const segments = segmentStoryPayload(defaultStoryScript);
-    segments.forEach((segment, index) => {
-        const meta = {};
-        if (segment.storyType) meta.storyType = segment.storyType;
-        meta.segmentIndex = index;
-        meta.segmentTotal = segments.length;
-        const hasMeta = Object.keys(meta).length > 0;
-        entries.push({
-            role: "system",
-            text: segment.text,
-            time: baseTime + index,
-            meta: hasMeta ? meta : null
-        });
-    });
-    entries.push({
-        role: "user",
-        text: "我站在便利店门口。",
-        time: baseTime + segments.length + 1
-    });
-    entries.push({
-        role: "assistant",
-        text: "#D 别挡着，靠得再近一点。",
-        time: baseTime + segments.length + 2
-    });
-    return entries;
+function seedDefaultStory(card = getActiveCard()) {
+    const opener = (card?.opener && String(card.opener).trim()) || (card?.id === "default" ? DEFAULT_OPENER_FALLBACK : GENERIC_OPENER_FALLBACK);
+    const segments = segmentStoryPayload(opener);
+    if (!segments.length) return [];
+    const total = segments.length;
+    return segments.map((segment, index) =>
+        createStoryEntry("system", segment.text, {}, segment.storyType, index, total)
+    );
 }
 
 function createId(prefix = "id") {
@@ -137,10 +95,11 @@ function createId(prefix = "id") {
     return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function createDefaultState() {
+function createDefaultState(card = getActiveCard()) {
+    const baseStory = seedDefaultStory(card);
     return {
         systemVersion: SYSTEM_VERSION,
-        story: defaultStory.map(entry => ({ ...entry, id: entry.id || createId("story") })),
+        story: baseStory.map(entry => ({ ...entry, id: entry.id || createId("story") })),
         contacts: initialContacts.map(c => ({ ...c })),
         chats: initialChats().map((chat, idx) => enrichChat(chat, idx)),
         chatOrder: ["yuan", "room", "shadow", "sys"],
@@ -263,6 +222,13 @@ export function initializeWorldState(loadedState = null) {
 
 export function getWorldState() {
     return worldState;
+}
+
+export function setWorldState(next) {
+    if (!next) return;
+    worldState = next;
+    hydrateShortMemory(worldState.story || []);
+    emit("world:set", { state: worldState });
 }
 
 export function subscribeWorldState(listener) {

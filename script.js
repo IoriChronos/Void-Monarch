@@ -26,6 +26,10 @@ import { saveSnapshot, restoreSnapshot, dropSnapshotsAfter } from "./core/timeli
 import { getLongMemoryContextLimit, setLongMemoryContextLimit } from "./data/memory-long.js";
 import { addEventLog } from "./data/events-log.js";
 import { initAbyssBackground } from "./ui/abyss-bg.js";
+import { initCharacterProfile } from "./ui/character-profile.js";
+import { saveSlot, loadSlot, deleteSlot, listSlots } from "./data/save-slots.js";
+import { saveRoleTemp, loadRoleTemp, peekRoleTemp, clearRoleTemp } from "./data/role-temp.js";
+import { getActiveCard, listCharacterCards } from "./data/character-cards.js";
 
 let storyUI = null;
 let storyBound = false;
@@ -61,6 +65,11 @@ document.addEventListener("DOMContentLoaded", () => {
     safe("dynamic-island", () => initDynamicIsland({ onCallAction: handleIslandCallAction }));
     safe("clock", () => initClock());
     safe("battery", () => initBattery());
+    const profileUI = safe("character-profile", () => initCharacterProfile(
+        document.getElementById("story-header"),
+        document.getElementById("character-sheet"),
+        { onRoleChange: handleRoleChange, onRoleUpdate: updateRoleLabel }
+    ));
 
     safe("memo", () => initMemoApp());
     safe("shopping", () => initShoppingApp());
@@ -91,11 +100,18 @@ document.addEventListener("DOMContentLoaded", () => {
         onLongMemoryChange: handleLongMemoryChange,
         providerOptions: getProviderOptions(),
         currentProvider: getActiveProviderId(),
-        onProviderChange: handleProviderChange
+        onProviderChange: handleProviderChange,
+        onToggleProfile: (open) => {
+            if (!profileUI) return;
+            if (open) profileUI.show?.();
+            else profileUI.hide?.();
+        }
     })) || {};
     safe("story-hydrate", () => hydrateStoryLog());
     safe("story-stream", () => bindStoryStream());
     safe("story-hide-toggle", () => initStoryHideToggle());
+    updateRoleLabel();
+    showRestoreHint("");
 
     window.addEventListener("message", (event) => {
         if (typeof event.data === "string") {
@@ -109,11 +125,109 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("timeline:overflow", () => {
         storyUI?.showTimelineToast?.("旧的快照已覆盖");
     });
+
+    Object.assign(window, {
+        saveSlot,
+        loadSlot,
+        deleteSlot,
+        listSlots
+    });
 });
 
 function hydrateStoryLog() {
     const history = getWorldState().story || [];
     storyUI.replaceHistory?.(history);
+}
+
+function updateRoleLabel() {
+    const active = getActiveCard();
+    const name = active?.name || "元书";
+    const title = document.getElementById("story-title-text") || document.querySelector(".story-title");
+    if (title) title.textContent = name;
+}
+
+function showRestoreHint(text) {
+    const el = document.getElementById("role-restore-hint");
+    if (!el) return;
+    el.textContent = text || "";
+    el.style.display = text ? "inline-flex" : "none";
+}
+
+function getCardNameById(id) {
+    if (!id) return "元书";
+    try {
+        const list = listCharacterCards?.() || [];
+        const found = list.find(item => item.id === id);
+        return found?.name || "元书";
+    } catch {
+        return "元书";
+    }
+}
+
+function handleRoleChange(prevId, nextId) {
+    if (!nextId) return;
+    if (prevId && prevId !== nextId) {
+        const prevName = getCardNameById(prevId);
+        saveRoleTemp(prevId, { roleName: prevName });
+        storyUI?.showTimelineToast?.(`已暂存 ${prevName} 的上次聊天`);
+        showRestoreHint(`上次聊天 · ${prevName} 已暂存`);
+    }
+    const restored = loadRoleTemp(nextId);
+    if (restored) {
+        hydrateStoryLog();
+        refreshWeChatUI();
+        resetCallInterface();
+        refreshAbyssBackground();
+        const nextName = getCardNameById(nextId);
+        storyUI?.showTimelineToast?.(`上次聊天 · ${nextName} 已恢复`);
+        showRestoreHint(`上次聊天 · ${nextName}`);
+        clearRoleTemp();
+    } else {
+        resetAll();
+        refreshStoryLogView();
+        refreshWeChatUI();
+        resetCallInterface();
+        refreshAbyssBackground();
+        showRestoreHint("");
+    }
+    updateRoleLabel();
+}
+
+function initQuickInputBar() {
+    const row = document.getElementById("story-input-row");
+    const input = document.getElementById("story-input");
+    if (!row || !input) return;
+    if (document.getElementById("story-input-quickbar")) return;
+    const bar = document.createElement("div");
+    bar.id = "story-input-quickbar";
+    const presets = [
+        { label: "叙述", text: "#N " },
+        { label: "动作", text: "#A " },
+        { label: "对白", text: "#D " },
+        { label: "旁白", text: "#S " }
+    ];
+    presets.forEach(preset => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = preset.label;
+        btn.addEventListener("click", () => {
+            insertAtCursor(input, preset.text);
+            input.focus();
+        });
+        bar.appendChild(btn);
+    });
+    row.insertBefore(bar, row.firstChild);
+}
+
+function insertAtCursor(el, text) {
+    if (!el) return;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    const before = el.value.slice(0, start);
+    const after = el.value.slice(end);
+    el.value = `${before}${text}${after}`;
+    const pos = start + text.length;
+    el.setSelectionRange(pos, pos);
 }
 
 function bindStoryStream() {
@@ -136,12 +250,18 @@ function bindStoryStream() {
 
 function initStoryHideToggle() {
     const panel = document.getElementById("story-panel");
+    const storyHeader = document.getElementById("story-header");
+    const footer = document.getElementById("story-input-row");
+    const sheet = document.getElementById("character-sheet");
     if (!panel || panel.__hideToggleBound) return;
     panel.__hideToggleBound = true;
     // 确保刷新后默认可见
     panel.classList.remove("story-hide-text");
     const handler = (ev) => {
-        if (ev.target.closest(".story-bubble") || ev.target.closest("#story-input") || ev.target.closest(".story-input-bar")) return;
+        if (storyHeader && storyHeader.contains(ev.target)) return;
+        if (footer && footer.contains(ev.target)) return;
+        if (sheet && sheet.contains(ev.target)) return;
+        if (ev.target.closest(".story-tools-menu") || ev.target.closest("#story-input") || ev.target.closest(".story-input-bar")) return;
         panel.classList.toggle("story-hide-text");
     };
     panel.addEventListener("dblclick", handler, true);

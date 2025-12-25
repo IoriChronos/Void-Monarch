@@ -24,6 +24,7 @@ export function initAIChatWindow(options = {}) {
     const storySubtitle = document.querySelector(".story-subtitle");
     const characterSheet = document.getElementById("character-sheet");
     const characterCloseBtn = document.getElementById("character-sheet-close");
+    const storyLayer = document.querySelector(".story-bubbles-layer");
 
     if (!storyLog || !storyInput || !storySend) {
         console.warn("AI chat window elements missing, skipping initAIChatWindow");
@@ -54,6 +55,11 @@ export function initAIChatWindow(options = {}) {
     };
     let lastBubbleType = null;
     let lastBubbleNode = null;
+    const scrollBottomBtn = createScrollBottomButton();
+
+    storyLog.addEventListener("scroll", updateScrollHint);
+    window.addEventListener("resize", updateScrollHint);
+    updateScrollHint();
 
     function limitTwoLines() {
         storyInput.classList.remove("expanded");
@@ -402,9 +408,6 @@ export function initAIChatWindow(options = {}) {
         }
     });
 
-    storySubtitle?.addEventListener("dblclick", () => toggleCharacterPanel());
-    characterCloseBtn?.addEventListener("click", () => toggleCharacterPanel(false));
-
     editCancelBtn?.addEventListener("click", closeEditDialog);
     editSaveBtn?.addEventListener("click", submitEditDialog);
     editSheet?.addEventListener("click", (event) => {
@@ -452,6 +455,7 @@ export function initAIChatWindow(options = {}) {
         const bubble = storyLog.querySelector(`[data-snapshot="${snapshotId}"]`);
         if (bubble) {
             bubble.scrollIntoView({ behavior: "smooth", block: "center" });
+            requestAnimationFrame(updateScrollHint);
         }
     }
 
@@ -484,10 +488,16 @@ export function initAIChatWindow(options = {}) {
         latestSystemId = lastSystem?.id || null;
     }
 
-    function scrollToBottom() {
+    function scrollToBottom(options = {}) {
         if (!storyLog) return;
+        const behavior = options.behavior || (options.smooth ? "smooth" : "auto");
         requestAnimationFrame(() => {
-            storyLog.scrollTop = storyLog.scrollHeight;
+            if (storyLog.scrollTo) {
+                storyLog.scrollTo({ top: storyLog.scrollHeight, behavior });
+            } else {
+                storyLog.scrollTop = storyLog.scrollHeight;
+            }
+            updateScrollHint();
         });
     }
 
@@ -577,7 +587,9 @@ export function initAIChatWindow(options = {}) {
             ? forceValue
             : !characterSheet.classList.contains("show");
         characterSheet.classList.toggle("show", nextState);
+        characterSheet.classList.toggle("open", nextState);
         characterSheet.setAttribute("aria-hidden", nextState ? "false" : "true");
+        options.onToggleProfile?.(nextState);
     }
 
     async function submitEditDialog() {
@@ -690,5 +702,28 @@ export function initAIChatWindow(options = {}) {
         }
         lastBubbleType = type;
         lastBubbleNode = node;
+    }
+
+    function isNearBottom() {
+        if (!storyLog) return true;
+        const distance = storyLog.scrollHeight - storyLog.clientHeight - storyLog.scrollTop;
+        return distance < 48;
+    }
+
+    function updateScrollHint() {
+        if (!scrollBottomBtn) return;
+        scrollBottomBtn.classList.toggle("visible", !isNearBottom());
+    }
+
+    function createScrollBottomButton() {
+        const btn = document.createElement("button");
+        btn.id = "story-scroll-bottom";
+        btn.type = "button";
+        btn.setAttribute("aria-label", "回到底部");
+        btn.innerHTML = `<span class="chevron">↓</span>`;
+        btn.addEventListener("click", () => scrollToBottom({ behavior: "smooth" }));
+        const host = storyLayer || storyPanelEl || storyLog.parentElement;
+        host?.appendChild(btn);
+        return btn;
     }
 }

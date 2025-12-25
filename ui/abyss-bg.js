@@ -7,6 +7,8 @@ const LAYER3_COLORS = ["#ffb46e", "#ff7fa5", "#c38fff"];
 const LAYER1_COUNT = 100;
 const LAYER2_COUNT = 70;
 const LAYER3_COUNT = 24;
+const TENTACLE_ART_RED = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='176' shape-rendering='crispEdges'><rect width='96' height='176' fill='none'/><path fill='%230a060d' d='M18 152h18v24H18z'/><path fill='%2313071a' d='M24 118h16v60H24z'/><path fill='%23230d29' d='M32 84h14v80H32z'/><path fill='%232e0f33' d='M40 58h14v90H40z'/><path fill='%23380f3a' d='M50 40h12v90H50z'/><path fill='%2355133f' d='M56 30h10v78H56z'/><path fill='%2374183f' d='M60 22h10v64H60z'/><path fill='%23a3273c' d='M64 16h8v50H64z'/><path fill='%23d8485c' d='M68 12h6v32H68z'/></svg>\")";
+const TENTACLE_ART_BLUE = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='176' shape-rendering='crispEdges'><rect width='96' height='176' fill='none'/><path fill='%23060a14' d='M18 152h18v24H18z'/><path fill='%230c1124' d='M24 118h16v60H24z'/><path fill='%2314253f' d='M32 84h14v80H32z'/><path fill='%2320365a' d='M40 58h14v90H40z'/><path fill='%23314b78' d='M50 40h12v90H50z'/><path fill='%2343629b' d='M56 30h10v78H56z'/><path fill='%235c7cc0' d='M60 22h10v64H60z'/><path fill='%2382a5e8' d='M64 16h8v50H64z'/><path fill='%23b7d2ff' d='M68 12h6v32H68z'/></svg>\")";
 
 export function initAbyssBackground(panel = document.getElementById("story-panel")) {
     if (!panel) return null;
@@ -181,9 +183,15 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
             } = options;
             if (!tentacleLayer) return;
 
-            const spawnCount = 1; // 限制一次只出一根
+            const paletteSelections = [];
+            if (Math.random() < 0.8) paletteSelections.push("red");
+            if (Math.random() < 0.4) paletteSelections.push("blue");
+            if (paletteSelections.length === 0) paletteSelections.push("red");
+
+            const spawnCount = Math.max(1, Math.max(count, paletteSelections.length));
             for (let i = 0; i < spawnCount; i++) {
-                const targetLayer = tentacleLayer;
+                const palette = paletteSelections[i % paletteSelections.length];
+                const targetLayer = layer === "upper" ? (upperTentacleLayer || tentacleLayer) : tentacleLayer;
                 if (!targetLayer) continue;
 
                 const spawn = pickSpawnPoint(width, height);
@@ -192,6 +200,7 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
                 const t = document.createElement("div");
                 t.className = "abyss-tentacle";
                 if (debug) t.classList.add("debug");
+                if (palette === "blue") t.classList.add("overlay");
                 t.dataset.edge = spawn.edge || "inner";
                 const base = document.createElement("div");
                 base.className = "tentacle-base";
@@ -202,37 +211,35 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
                 const head = document.createElement("div");
                 head.className = "tentacle-head";
 
-                // 颜色变体：底层也有蓝紫高层感
-                const paletteChance = Math.random();
-                if (paletteChance < 0.45) {
-                    body.style.setProperty("--tentacle-art", "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='128' shape-rendering='crispEdges'><rect width='96' height='128' fill='none'/><path fill='%23060a14' d='M18 120h14v8H18z'/><path fill='%230c1124' d='M22 100h14v28H22z'/><path fill='%2314253f' d='M30 66h12v64H30z'/><path fill='%2320365a' d='M40 42h12v94H40z'/><path fill='%23314b78' d='M48 30h12v90H48z'/><path fill='%2343629b' d='M56 26h10v72H56z'/><path fill='%235c7cc0' d='M60 24h10v48H60z'/><path fill='%2382a5e8' d='M64 20h8v36h-8z'/><path fill='%23b7d2ff' d='M68 18h6v18h-6z'/></svg>\")");
-                }
+                const art = palette === "blue" ? TENTACLE_ART_BLUE : TENTACLE_ART_RED;
+                body.style.setProperty("--tentacle-art", art);
                 core.append(body, head);
                 t.append(base, core);
 
-                // 随机动画：轻摇 / 软弯 / 深弯 / 触碰
-                const animPick = Math.random();
-                if (animPick < 0.35) {
-                    core.classList.add("anim-sway");
-                } else if (animPick < 0.65) {
-                    core.classList.add("anim-curl-soft");
-                } else if (animPick < 0.9) {
-                    core.classList.add("anim-curl-deep");
-                } else {
-                    core.classList.add("anim-touch");
-                }
+                // 动画池：摇晃 + 多级蜷曲 + 触碰
+                const animPool = [
+                    "anim-sway",
+                    "anim-sway-wide",
+                    "anim-curl-soft",
+                    "anim-curl-medium",
+                    "anim-curl-deep",
+                    "anim-curl-tight",
+                    "anim-touch",
+                    "anim-wobble"
+                ];
+                core.classList.add(pick(animPool));
 
                 t.style.setProperty("--tentacle-x", `${spawn.x.toFixed(1)}px`);
                 t.style.setProperty("--tentacle-y", `${spawn.y.toFixed(1)}px`);
                 t.style.setProperty("--tentacle-angle", `${angle}deg`);
 
-                const scale = 1; // 固定尺寸，避免缩放带来位移偏差
-                const wiggle = (0.9 + Math.random() * 0.3) * speed;   // 调整：轻微摆幅
-                const delay = Math.random() * 0.25;                   // 调整：起始延迟
-                const thicknessScale = 1 * thickness;                 // 调整：粗细缩放
-                const enterDur = 1 + Math.random() * 0.3;             // 调整：入场时长 1.0~1.3s
-                const idleDur = 2.6 + Math.random() * 1.6;            // 调整：停留时长 2.6~4.2s
-                const retreatDur = 0.9 + Math.random() * 0.6;         // 调整：退场时长 0.9~1.5s
+                const scale = 0.95 + Math.random() * 0.2;             // 尺寸轻微浮动
+                const wiggle = (0.85 + Math.random() * 0.9) * speed;  // 摆幅幅度
+                const delay = Math.random() * 0.25;                   // 起始延迟
+                const thicknessScale = (0.9 + Math.random() * 1.1) * thickness; // 粗细
+                const enterDur = 1 + Math.random() * 0.35;            // 入场时长 1.0~1.35s
+                const idleDur = 2.8 + Math.random() * 1.8;            // 停留时长 2.8~4.6s
+                const retreatDur = 1 + Math.random() * 0.7;           // 退场时长 1.0~1.7s
 
                 t.style.setProperty("--tentacle-scale", scale.toFixed(2));
                 t.style.setProperty("--tentacle-wiggle", wiggle.toFixed(2));
@@ -245,7 +252,6 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
                 targetLayer.appendChild(t);
 
                 const totalLife = (delay + enterDur + idleDur + retreatDur + 0.2) * 1000;
-                const retreatAt = (delay + enterDur + idleDur) * 1000;
                 let cleaned = false;
 
                 const cleanup = () => {
@@ -254,15 +260,7 @@ function createAbyssEngine(panel, root, canvases, layers = {}) {
                     t.remove();
                 };
 
-                const retreatTimer = setTimeout(() => {
-                    t.classList.add("retreat");
-                    setTimeout(cleanup, 1400);
-                }, retreatAt);
-
-                setTimeout(() => {
-                    clearTimeout(retreatTimer);
-                    cleanup();
-                }, totalLife);
+                setTimeout(cleanup, totalLife);
             }
         },
         pressureWave(mode = "pulse", intensity = 1) {

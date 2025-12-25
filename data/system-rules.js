@@ -1,3 +1,5 @@
+import { appendDynamicToActive, getActiveCard } from "./character-cards.js";
+
 const STORAGE_KEY = "yuan-phone:system-rules";
 
 const defaultRules = {
@@ -72,6 +74,7 @@ export function appendDynamicRule(text) {
     if (!trimmed) return;
     systemRules.dynamic = systemRules.dynamic || [];
     systemRules.dynamic.push(trimmed);
+    appendDynamicToActive(trimmed);
     persist();
 }
 
@@ -87,9 +90,15 @@ export function loadSystemRules() {
 
 export function buildSystemPrompt() {
     const rules = getSystemRules();
-    const segments = [rules.persona, rules.world, rules.rules];
-    if (rules.dynamic.length) {
-        segments.push(rules.dynamic.join("\n"));
+    const card = getActiveCard();
+    const segments = [
+        card.worldLore || rules.world,
+        card.persona || rules.persona,
+        card.rules || rules.rules
+    ];
+    const dynamic = (card.dynamic && card.dynamic.length) ? card.dynamic : rules.dynamic;
+    if (dynamic.length) {
+        segments.push(dynamic.join("\n"));
     }
     return segments.filter(Boolean).join("\n");
 }
