@@ -8,8 +8,15 @@ import { renderSettings } from "./pages/settings-page.js";
 import { renderUnlock } from "./pages/unlock-page.js";
 import { navigateTo } from "./pages/nav.js";
 import { getState } from "./state.js";
+import { applyStoredAppearance } from "./appearance.js";
+import { enforceComponentLayer, observeComponentLayer } from "../core/component-layer.js";
 
 const appRoot = document.getElementById("app-root");
+
+enforceComponentLayer(document.body);
+observeComponentLayer(document.body);
+
+applyStoredAppearance();
 
 showUnlockSplash();
 

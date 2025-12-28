@@ -266,15 +266,108 @@
             </div>
 
             <div id="mmo-page" class="app-page" style="display:none;">
-                <div class="page-header">
-                    <button class="back-home">‹</button>
-                    <span>侠客</span>
-                </div>
-                <div class="page-body app-scroll">
-                    <p>MMO 框架已搭建，等待剧情与交互填充。</p>
-                    <p>可以在这里查看门派、练功与战报。</p>
+                <div class="mmo-shell" data-state="login">
+                    <div class="mmo-login">
+                        <h2 class="mmo-title">燕云十六声</h2>
+                        <p class="mmo-sub">武侠像素世界 · 纯前端 Demo</p>
+                        <button class="ui-btn ui-primary" data-act="mmo-enter">点击进入游戏</button>
+                    </div>
+                    <div class="mmo-main" hidden>
+                        <div class="mmo-bg">
+                            <div class="mmo-bg-gradient"></div>
+                            <canvas id="mmo-particles"></canvas>
+                        </div>
+                        <header class="mmo-topbar">
+                            <div class="mmo-avatar" data-act="open-bag"><span id="mmo-avatar-initial">侠</span></div>
+                            <div class="mmo-top-info">
+                                <span class="mmo-currency" id="mmo-currency-main"></span>
+                            </div>
+                            <button class="mmo-menu-btn ui-btn ui-ghost" data-act="toggle-menu">≡</button>
+                        </header>
+                        <aside class="mmo-menu" aria-hidden="true">
+                            <button data-view="pixel">定制像素画</button>
+                            <button data-view="shop">商店</button>
+                            <button data-view="gacha">卡池</button>
+                            <button data-view="recharge">充值</button>
+                            <button data-view="leaderboard">排行榜</button>
+                        </aside>
+                        <main class="mmo-content app-scroll">
+                            <section class="mmo-view mmo-home" data-view="home">
+                                <div class="mmo-hero">
+                                    <h3>竹影弈 · 云间游</h3>
+                                    <p>在像素竹林中游历，收集灵玉、套装与晶体。此为纯前端模拟 Demo，不接入剧情与记忆。</p>
+                                    <div class="mmo-cta-row">
+                                        <button class="ui-btn ui-primary" data-view-target="shop">前往商店</button>
+                                        <button class="ui-btn ui-ghost" data-view-target="gacha">试试抽卡</button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="mmo-view mmo-shop" data-view="shop" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-shop"></span>
+                                    <span class="mmo-pity" id="mmo-score-shop"></span>
+                                </div>
+                                <div class="mmo-shop-body">
+                                    <div class="mmo-shop-list" id="mmo-shop-list"></div>
+                                    <div class="mmo-shop-detail" id="mmo-shop-detail">
+                                        <div class="mmo-shop-placeholder">请选择套装</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="mmo-view mmo-gacha" data-view="gacha" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-gacha"></span>
+                                    <span class="mmo-pity" id="mmo-pity">距保底：-- 抽</span>
+                                </div>
+                                <div class="mmo-gacha-bg">
+                                    <div class="mmo-gacha-results" id="mmo-gacha-results"></div>
+                                    <div class="mmo-gacha-actions">
+                                        <button class="ui-btn ui-ghost" data-pulls="1">1 抽</button>
+                                        <button class="ui-btn ui-primary" data-pulls="10">10 抽</button>
+                                        <button class="ui-btn ui-ghost" data-pulls="50">50 抽</button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="mmo-view mmo-recharge" data-view="recharge" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-recharge"></span>
+                                    <span class="mmo-wallet-tip">扣款来源：微信钱包</span>
+                                </div>
+                                <div class="mmo-recharge-cards" id="mmo-recharge-cards"></div>
+                            </section>
+
+                            <section class="mmo-view mmo-leader" data-view="leaderboard" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-leader"></span>
+                                    <span class="mmo-pity" id="mmo-score-rank"></span>
+                                </div>
+                                <div class="mmo-leader-list" id="mmo-leader-list"></div>
+                                <div class="mmo-player-rank" id="mmo-player-rank"></div>
+                            </section>
+
+                            <section class="mmo-view mmo-bag" data-view="bag" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-bag"></span>
+                                    <span class="mmo-pity">背包</span>
+                                </div>
+                                <div class="mmo-bag-list" id="mmo-bag-list"></div>
+                            </section>
+
+                            <section class="mmo-view mmo-pixel" data-view="pixel" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-pixel"></span>
+                                    <span class="mmo-pity">像素画定制 · 占位</span>
+                                </div>
+                                <p class="mmo-placeholder">这里将展示像素头像/动态，当前为占位页面。</p>
+                            </section>
+                        </main>
+                    </div>
                 </div>
             </div>
+
         </div>
         <div id="red-envelope-overlay" aria-hidden="true">
             <div class="red-envelope-card">

@@ -1,0 +1,94 @@
+@import url("../tokens.css");
+
+body {
+    font-family: var(--ui-font-base);
+}
+
+#app-root .ui-page-header {
+    background: var(--ui-surface-0);
+    border-bottom: 1px solid var(--ui-border);
+    padding-inline: var(--ui-space-8);
+}
+
+#tab-bar {
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--ui-border);
+}
+
+#tab-bar .tab-btn {
+    flex: 1;
+    width: 100%;
+    justify-content: center;
+}
+
+#tab-bar .tab-btn.ui-btn {
+    height: 42px;
+    border-radius: var(--ui-radius-sm);
+    border: none;
+    background: transparent;
+    box-shadow: none;
+}
+
+#tab-bar .tab-btn.ui-btn.active {
+    background: color-mix(in srgb, var(--ui-accent) 22%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ui-accent) 42%, transparent);
+}
+
+.home-page .home-global-actions .ui-btn {
+    height: 34px;
+    padding-inline: var(--ui-space-10);
+}
+
+.home-rule-inner .ui-input,
+.home-rule-inner .ui-input-field,
+.home-dialog-panel .ui-input,
+.home-dialog-panel .ui-input-field,
+.persona-card .ui-input,
+.persona-card .ui-input-field {
+    box-shadow: none;
+    border: none;
+    background: transparent;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.home-card-upload .ui-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+.home-card-upload .ui-input-field {
+    padding: 0;
+    cursor: pointer;
+}
+
+.home-page .home-card.ui-panel {
+    overflow: hidden;
+}
+
+.messages-page .msg-topbar {
+    background: var(--ui-surface-0);
+    padding: var(--ui-space-10) var(--ui-space-4);
+}
+
+.messages-page .msg-card.ui-panel + .msg-card.ui-panel {
+    margin-top: var(--ui-space-10);
+}
+
+.settings-card .ui-input,
+.settings-card .ui-input-field {
+    border: none;
+    box-shadow: inset 0 0 0 1px var(--ui-border);
+    background: var(--ui-surface-0);
+}
+
+.role-detail-form .ui-input,
+.role-detail-form .ui-input-field {
+    border: none;
+    box-shadow: inset 0 0 0 1px var(--ui-border);
+    background: var(--ui-surface-1);
+}

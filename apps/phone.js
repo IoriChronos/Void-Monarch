@@ -1,5 +1,4 @@
 import { getState, updateState } from "../core/state.js";
-import { askAI } from "../core/ai.js";
 import { addShortEventMemory } from "../data/memory-short.js";
 import { addEventLog } from "../data/events-log.js";
 import {
@@ -90,13 +89,14 @@ function updateCallHistory(index, patch = {}) {
     updateState("phone.calls", calls);
 }
 
-export function startCallSession(name, direction = "incoming") {
+export function startCallSession(name, direction = "incoming", options = {}) {
     ensureCallOverlayElements();
     hideIslandCallAlert();
     if (!callOverlayState.container) return;
     callOverlayState.activeName = name;
     callOverlayState.direction = direction;
     callOverlayState.transcriptLog = [];
+    const scriptLines = Array.isArray(options.scriptLines) ? options.scriptLines.filter(line => (line || "").trim()) : [];
     if (callOverlayState.transcriptEl) {
         callOverlayState.transcriptEl.innerHTML = "";
     }
@@ -117,7 +117,9 @@ export function startCallSession(name, direction = "incoming") {
     if (callOverlayState.timerId) clearInterval(callOverlayState.timerId);
     callOverlayState.timerId = setInterval(updateCallTimerDisplay, 1000);
     setIslandLabel(`${name} · 通话中`);
-    startTranscriptLoop(name);
+    if (scriptLines.length) {
+        playScriptLines(scriptLines, options.lineDelay || 900);
+    }
     recordCallEvent(`${name} ${direction === "incoming" ? "接通来电" : "开始通话"}`, { direction });
 }
 
@@ -208,19 +210,37 @@ function stopTranscriptLoop() {
     }
 }
 
-function startTranscriptLoop(name) {
+function playScriptLines(lines = [], delay = 900) {
     stopTranscriptLoop();
-    const pump = async () => {
+    if (!callOverlayState.activeName) return;
+    const queue = Array.isArray(lines) ? lines.filter(line => (line || "").trim()) : [];
+    if (!queue.length) return;
+    let idx = 0;
+    const pump = () => {
         if (!callOverlayState.activeName) return;
-        try {
-            const line = await askAI(`通话转写：${name} 正在说什么？`);
-            if (line) appendTranscriptLine(line, "npc");
-        } catch (err) {
-            console.error("通话转写失败", err);
+        const line = queue[idx];
+        appendTranscriptLine(line, "npc");
+        idx += 1;
+        if (idx < queue.length) {
+            callOverlayState.transcriptTimer = setTimeout(pump, delay);
         }
-        callOverlayState.transcriptTimer = setTimeout(pump, 2000);
     };
     pump();
+}
+
+function normalizeTranscriptLines(transcript = "") {
+    return String(transcript || "")
+        .split("\n")
+        .map(line => line.trim())
+        .filter(Boolean);
+}
+
+export function playCallTranscriptFromStory({ name = "来电", transcript = "", direction = "incoming", lineDelay = 900 } = {}) {
+    const lines = normalizeTranscriptLines(transcript);
+    if (!lines.length) return;
+    const caller = (name || "来电").trim() || "来电";
+    startCallSession(caller, direction, { scriptLines: lines, lineDelay });
+    return { caller, lines: lines.length };
 }
 
 export function resetCallInterface() {

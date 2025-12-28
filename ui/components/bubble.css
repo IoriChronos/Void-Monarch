@@ -1,0 +1,48 @@
+@import url("../tokens.css");
+
+.ui-bubble,
+.story-bubble {
+    position: relative;
+    border-radius: var(--ui-radius-lg);
+    padding: var(--ui-space-10) var(--ui-space-12);
+    background: var(--ui-surface-1);
+    border: 1px solid var(--ui-border);
+    color: var(--ui-text-strong);
+    line-height: 1.6;
+    box-shadow: var(--ui-shadow-lift);
+    overflow-wrap: anywhere;
+}
+
+.ui-bubble-content,
+.bubble-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.ui-bubble.ui-bubble-user,
+.story-bubble.bubble-user {
+    background: color-mix(in srgb, var(--ui-accent) 10%, var(--ui-surface-1));
+    border-color: color-mix(in srgb, var(--ui-accent) 40%, transparent);
+}
+
+.ui-bubble.ui-bubble-ai,
+.story-bubble.bubble-assistant {
+    background: color-mix(in srgb, var(--ui-surface-1) 90%, #000 10%);
+}
+
+.ui-bubble.ui-bubble-system,
+.story-bubble.bubble-system {
+    border-style: dashed;
+    background: color-mix(in srgb, var(--ui-surface-1) 92%, #222 8%);
+}
+
+.ui-bubble-system-input {
+    border-style: dashed;
+    background: color-mix(in srgb, var(--ui-accent) 12%, var(--ui-surface-1));
+}
+
+.ui-bubble .bubble-fold .fold-head .fold-toggle.ui-btn,
+.story-bubble .bubble-fold .fold-head .fold-toggle.ui-btn {
+    height: 30px;
+    padding: 0 var(--ui-space-10);
+}

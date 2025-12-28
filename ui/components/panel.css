@@ -1,0 +1,36 @@
+@import url("../tokens.css");
+
+.ui-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: var(--ui-surface-1);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-lg);
+    box-shadow: var(--ui-shadow-soft);
+    min-height: 0;
+}
+
+.ui-panel-header {
+    flex-shrink: 0;
+    padding: var(--ui-space-12) var(--ui-space-16);
+    border-bottom: 1px solid var(--ui-border);
+    font-weight: 600;
+    color: var(--ui-text-strong);
+}
+
+.ui-panel-body {
+    padding: var(--ui-space-12) var(--ui-space-16) var(--ui-space-16);
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-10);
+    min-height: 0;
+}
+
+.ui-panel .card-actions {
+    gap: var(--ui-space-10);
+}
+
+.ui-panel + .ui-panel {
+    margin-top: var(--ui-space-12);
+}

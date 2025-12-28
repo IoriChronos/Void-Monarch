@@ -16,7 +16,7 @@ export function initAIChatWindow(options = {}) {
     const memoryValue = document.getElementById("long-memory-value");
     const fontSlider = document.getElementById("story-font-slider");
     const fontValue = document.getElementById("story-font-value");
-    const providerSelect = document.getElementById("ai-provider-select");
+    const providerSelect = document.getElementById("narrator-model-select") || document.getElementById("ai-provider-select");
     const editSheet = document.getElementById("story-edit-sheet");
     const editInput = document.getElementById("story-edit-input");
     const editSaveBtn = document.getElementById("story-edit-save");
@@ -26,6 +26,7 @@ export function initAIChatWindow(options = {}) {
     const characterSheet = document.getElementById("character-sheet");
     const characterCloseBtn = document.getElementById("character-sheet-close");
     const storyLayer = document.querySelector(".story-bubbles-layer");
+    const storyInputRow = document.getElementById("story-input-row");
 
     if (!storyLog || !storyInput || !storySend) {
         console.warn("AI chat window elements missing, skipping initAIChatWindow");
@@ -37,7 +38,9 @@ export function initAIChatWindow(options = {}) {
             endAiReplyGroup: () => null,
             showTimelineToast: () => null,
             setBubbleSnapshot: () => null,
-            scrollToSnapshot: () => null
+            scrollToSnapshot: () => null,
+            lockInput: () => null,
+            unlockInput: () => null
         };
     }
 
@@ -47,6 +50,9 @@ export function initAIChatWindow(options = {}) {
     let latestSystemId = null;
     let lastBubbleFxHandle = null;
     let editingEntry = null;
+    let interactionLocked = false;
+    let lockReason = null;
+    let lastEnterAt = 0;
     const sceneFX = initRendererFx();
     const aiGroupState = {
         armed: false,
@@ -92,58 +98,92 @@ export function initAIChatWindow(options = {}) {
 
     function appendBubble(entry) {
         if (!storyLog || !entry) return null;
-        const role = entry.role || "system";
-        const rendered = renderStoryBubble(entry, {
-            sceneFX,
-            lastFxHandle: lastBubbleFxHandle
-        });
-        if (!rendered || !rendered.bubble) {
-            if (rendered?.handledFx) {
-                return null;
+        const segments = splitTaggedSegments(entry);
+        let lastBubble = null;
+        segments.forEach(seg => {
+            const role = seg.role || "system";
+            const prevBubble = storyLog.querySelector(".story-bubble:last-of-type");
+            const rendered = renderStoryBubble(seg, {
+                sceneFX,
+                lastFxHandle: lastBubbleFxHandle
+            });
+            if (!rendered || !rendered.bubble) {
+                if (rendered?.handledFx) return;
             }
-        }
-        const bubble = rendered?.bubble;
-        if (!bubble) return null;
-        bubble.dataset.role = role;
-        if (entry.id) {
-            bubble.dataset.message = entry.id;
-        }
-        if (entry.snapshotId) {
-            bubble.dataset.snapshot = entry.snapshotId;
-        }
-        bubble.__storyEntry = entry;
-        applyBubbleSpacing(bubble, rendered?.meta);
-        attachBubbleMenu(bubble, entry);
-        if (role === "system") {
-            ensureAiGroupStart();
-        } else if (aiGroupState.started && aiGroupState.armed) {
-            endAiReplyGroup();
-        }
-        storyLog.appendChild(bubble);
-        if (role === "system" && aiGroupState.armed) {
-            aiGroupState.lastBubble = bubble;
-        }
+            const bubble = rendered?.bubble;
+            if (!bubble) return;
+            bubble.dataset.role = role;
+            if (seg.id) {
+                bubble.dataset.message = seg.id;
+            }
+            if (seg.snapshotId) {
+                bubble.dataset.snapshot = seg.snapshotId;
+            }
+            if (seg.meta?.placeholder) {
+                bubble.dataset.placeholder = "true";
+                bubble.classList.add("ai-placeholder");
+            }
+            bubble.__storyEntry = seg;
+            applyPlaceholderState(bubble, seg);
+            applyBubbleSpacing(bubble, rendered?.meta);
+            attachBubbleMenu(bubble, seg);
+            if (bubble.classList.contains("bubble-dialog") && prevBubble?.classList.contains("bubble-dialog")) {
+                bubble.classList.add("bubble-dialog-linked");
+                prevBubble.classList.add("bubble-dialog-has-next");
+            }
+            if (role === "system") {
+                ensureAiGroupStart();
+            } else if (aiGroupState.started && aiGroupState.armed) {
+                endAiReplyGroup();
+            }
+            storyLog.appendChild(bubble);
+            if (role === "system" && aiGroupState.armed) {
+                aiGroupState.lastBubble = bubble;
+            }
+            lastBubbleFxHandle = rendered.fxHandle || lastBubbleFxHandle;
+            lastBubble = bubble;
+        });
+        if (!lastBubble) return null;
         scrollToBottom();
         if (continueBtn) {
             continueBtn.remove();
             continueBtn = null;
         }
-        if (role === "system" && isLastSystemSegment(entry)) {
+        if ((lastBubble.dataset.role || entry.role) === "system" && isLastSystemSegment(entry) && !entry.meta?.placeholder && !entry.meta?.error) {
             latestSystemId = entry.id || latestSystemId;
             continueBtn = document.createElement("button");
             continueBtn.className = "continue-btn align-left";
             continueBtn.textContent = "继续说";
             continueBtn.addEventListener("click", () => {
+                if (interactionLocked) return;
                 const handler = options.onContinue;
                 continueBtn?.remove();
                 continueBtn = null;
                 handler?.();
             }, { once: true });
-            bubble.insertAdjacentElement("afterend", continueBtn);
+            continueBtn.disabled = interactionLocked;
+            continueBtn.classList.toggle("locked", interactionLocked);
+            lastBubble.insertAdjacentElement("afterend", continueBtn);
             scrollToBottom();
         }
-        lastBubbleFxHandle = rendered.fxHandle || lastBubbleFxHandle;
-        return bubble;
+        return lastBubble;
+    }
+
+    function splitTaggedSegments(entry = {}) {
+        const text = entry.text || "";
+        const matches = [...text.matchAll(/(^|\n)(#[NATSD]\b)/g)];
+        if (matches.length <= 1) return [entry];
+        const segments = [];
+        for (let i = 0; i < matches.length; i++) {
+            const start = matches[i].index + (matches[i][1]?.length || 0);
+            const end = i + 1 < matches.length ? matches[i + 1].index : text.length;
+            const chunk = text.slice(start, end).trim();
+            if (!chunk) continue;
+            const cloned = { ...entry, text: chunk };
+            if (i > 0) delete cloned.id;
+            segments.push(cloned);
+        }
+        return segments.length ? segments : [entry];
     }
 
     function attachBubbleMenu(bubble, entry) {
@@ -151,6 +191,7 @@ export function initAIChatWindow(options = {}) {
         let startX, startY;
 
         const startPress = (e) => {
+            if (interactionLocked) return;
             // Ignore right-clicks on touch devices
             if (e.pointerType === 'touch' && e.button === 2) {
                 return;
@@ -188,6 +229,10 @@ export function initAIChatWindow(options = {}) {
         bubble.addEventListener("pointermove", moveCheck);
         
         bubble.addEventListener("contextmenu", (event) => {
+            if (interactionLocked) {
+                event.preventDefault();
+                return;
+            }
             if (pressTimer) {
                 clearTimeout(pressTimer);
                 pressTimer = null;
@@ -198,6 +243,7 @@ export function initAIChatWindow(options = {}) {
     }
 
     function openBubbleMenu(event, entry) {
+        if (interactionLocked) return;
         const actions = resolveBubbleActions(entry);
         if (!actions.length) return;
 
@@ -289,6 +335,61 @@ export function initAIChatWindow(options = {}) {
         }, 300);
     }
 
+    function setInputDisabled(disabled) {
+        if (disabled) {
+            storySend?.setAttribute("disabled", "true");
+            storySend?.classList.add("disabled");
+            storyInput?.classList.add("input-busy");
+            storyInputRow?.classList.add("input-locked");
+        } else {
+            storySend?.removeAttribute("disabled");
+            storySend?.classList.remove("disabled");
+            storyInput?.classList.remove("input-busy");
+            storyInputRow?.classList.remove("input-locked");
+        }
+    }
+
+    function setInert(node, state) {
+        if (!node) return;
+        if (state) {
+            node.setAttribute("inert", "true");
+            node.classList.add("locked");
+        } else {
+            node.removeAttribute("inert");
+            node.classList.remove("locked");
+        }
+    }
+
+    function setUiLocked(state) {
+        interactionLocked = state;
+        lockReason = state ? "generation" : null;
+        setInputDisabled(state);
+        toggleToolsMenu(false);
+        const hardLockTargets = [
+            storySend,
+            collapseBtn
+        ];
+        hardLockTargets.forEach(node => setInert(node, state));
+        const softLockTargets = [
+            systemBtn,
+            restartBtn,
+            newWindowBtn,
+            characterCloseBtn,
+            providerSelect,
+            memorySlider,
+            fontSlider,
+            toolsBtn,
+            toolsMenu
+        ];
+        const shouldSoftLock = state && lockReason !== "generation";
+        softLockTargets.forEach(node => setInert(node, shouldSoftLock));
+        restartButtons?.forEach(btn => setInert(btn, shouldSoftLock));
+        if (continueBtn) setInert(continueBtn, state);
+        if (contextMenu) closeBubbleMenu();
+        storyLayer?.classList.toggle("ai-generating", state);
+        storyPanelEl?.classList.toggle("ai-generating", state);
+    }
+
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
             closeBubbleMenu();
@@ -296,14 +397,19 @@ export function initAIChatWindow(options = {}) {
     });
 
     function resolveBubbleActions(entry = {}) {
+        const meta = entry.meta || {};
+        if (meta.placeholder || meta.error) return [];
         const items = [];
-        if (entry.snapshotId) {
+        const isLatestSystem = entry.role === "system" && entry.id && entry.id === latestSystemId;
+        const snapshotAllowed = entry.snapshotId
+            && (!options.isSnapshotAllowed || options.isSnapshotAllowed(entry.snapshotId));
+        if (snapshotAllowed) {
             items.push({ id: "rewind", label: "回溯到此刻" });
         }
-        if (entry.role === "system" && entry.id && entry.id === latestSystemId) {
+        if (isLatestSystem) {
             items.push({ id: "retry", label: "重说这一句" });
         }
-        if (entry.role === "system") {
+        if (isLatestSystem) {
             items.push({ id: "edit", label: "编辑这一句" });
         }
         return items;
@@ -318,6 +424,7 @@ export function initAIChatWindow(options = {}) {
     }
 
     function handleSubmit() {
+        if (interactionLocked) return;
         const value = storyInput.value.trim();
         if (!value) return;
         storyInput.value = "";
@@ -344,18 +451,32 @@ export function initAIChatWindow(options = {}) {
         const targetState = typeof forceValue === "boolean"
             ? forceValue
             : !toolsMenu?.classList.contains("show");
+        if (interactionLocked && lockReason !== "generation" && targetState) return;
         toolsMenu?.classList.toggle("show", targetState);
         toolsBtn?.classList.toggle("active", targetState);
+        if (toolsMenu && !targetState && toolsMenu.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+        if (toolsMenu) {
+            if (targetState) {
+                toolsMenu.removeAttribute("inert");
+            } else {
+                toolsMenu.setAttribute("inert", "true");
+            }
+        }
     }
 
     function openRestartSheet() {
         restartSheet?.classList.add("show");
-        restartSheet?.setAttribute("aria-hidden", "false");
+        restartSheet?.removeAttribute("inert");
     }
 
     function closeRestartSheet() {
         restartSheet?.classList.remove("show");
-        restartSheet?.setAttribute("aria-hidden", "true");
+        if (restartSheet?.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+        restartSheet?.setAttribute("inert", "true");
     }
 
     storyInput.addEventListener("input", autoGrowInput);
@@ -366,10 +487,29 @@ export function initAIChatWindow(options = {}) {
     }
     storySend.addEventListener("click", handleSubmit);
     storyInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSubmit();
+        if (interactionLocked) {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            return;
         }
+        if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && !e.isComposing) {
+            const now = Date.now();
+            const doubleTap = now - lastEnterAt < 380;
+            if (doubleTap) {
+                e.preventDefault();
+                handleSubmit();
+                lastEnterAt = 0;
+                return;
+            }
+            lastEnterAt = now;
+            // 单次回车默认换行，不触发发送
+        }
+    });
+
+    storyInput.addEventListener("blur", () => {
+        lastEnterAt = 0;
     });
 
     toolsBtn?.addEventListener("click", () => {
@@ -444,9 +584,10 @@ export function initAIChatWindow(options = {}) {
         });
     }
 
+
     function initProviderControl() {
         if (!providerSelect) return;
-        const providers = options.providerOptions || [];
+        const providers = options.narratorModelOptions || options.providerOptions || [];
         providerSelect.innerHTML = "";
         providers.forEach(provider => {
             const opt = document.createElement("option");
@@ -454,10 +595,10 @@ export function initAIChatWindow(options = {}) {
             opt.textContent = provider.label;
             providerSelect.appendChild(opt);
         });
-        const initial = options.currentProvider || providers[0]?.id;
+        const initial = options.currentNarratorModel || options.currentProvider || providers[0]?.id;
         if (initial) providerSelect.value = initial;
         providerSelect.addEventListener("change", () => {
-            options.onProviderChange?.(providerSelect.value);
+            (options.onNarratorModelChange || options.onProviderChange)?.(providerSelect.value);
         });
     }
 
@@ -576,16 +717,20 @@ export function initAIChatWindow(options = {}) {
     function openEditDialog(entry) {
         if (!options.onEditMessage || !editSheet || !editInput) return;
         editingEntry = entry;
-        editInput.value = entry?.text || "";
+        const seed = typeof options.getEditSeed === "function" ? options.getEditSeed(entry) : null;
+        editInput.value = seed ?? entry?.text ?? "";
         editSheet.classList.add("show");
-        editSheet.setAttribute("aria-hidden", "false");
+        editSheet.removeAttribute("inert");
         requestAnimationFrame(() => editInput.focus());
     }
 
     function closeEditDialog() {
         if (!editSheet) return;
         editSheet.classList.remove("show");
-        editSheet.setAttribute("aria-hidden", "true");
+        if (editSheet.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+        editSheet.setAttribute("inert", "true");
         editingEntry = null;
         if (editSaveBtn) {
             editSaveBtn.disabled = false;
@@ -599,7 +744,14 @@ export function initAIChatWindow(options = {}) {
             : !characterSheet.classList.contains("show");
         characterSheet.classList.toggle("show", nextState);
         characterSheet.classList.toggle("open", nextState);
-        characterSheet.setAttribute("aria-hidden", nextState ? "false" : "true");
+        if (!nextState && characterSheet.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+        if (nextState) {
+            characterSheet.removeAttribute("inert");
+        } else {
+            characterSheet.setAttribute("inert", "true");
+        }
         options.onToggleProfile?.(nextState);
     }
 
@@ -637,13 +789,42 @@ export function initAIChatWindow(options = {}) {
         if (snapshotId) {
             bubble.dataset.snapshot = snapshotId;
         }
+        if (entry.meta?.placeholder) {
+            bubble.dataset.placeholder = "true";
+            bubble.classList.add("ai-placeholder");
+        }
         bubble.__storyEntry = entry;
+        applyPlaceholderState(bubble, entry);
         applyBubbleSpacing(bubble, rendered?.meta);
         attachBubbleMenu(bubble, entry);
         target.replaceWith(bubble);
         if (entry.role === "system" && aiGroupState.armed) {
             aiGroupState.lastBubble = bubble;
         }
+        if (continueBtn) {
+            continueBtn.remove();
+            continueBtn = null;
+        }
+        const isPlaceholder = Boolean(entry.meta?.placeholder);
+        const isError = Boolean(entry.meta?.error);
+        if (entry.role === "system" && isLastSystemSegment(entry) && !isPlaceholder && !isError) {
+            latestSystemId = entry.id || latestSystemId;
+            continueBtn = document.createElement("button");
+            continueBtn.className = "continue-btn align-left";
+            continueBtn.textContent = "继续说";
+            continueBtn.addEventListener("click", () => {
+            if (interactionLocked) return;
+            const handler = options.onContinue;
+            continueBtn?.remove();
+            continueBtn = null;
+            handler?.();
+        }, { once: true });
+            continueBtn.disabled = interactionLocked;
+            continueBtn.classList.toggle("locked", interactionLocked);
+            bubble.insertAdjacentElement("afterend", continueBtn);
+            scrollToBottom();
+        }
+        return bubble;
     }
 
     function isLastSystemSegment(entry = {}) {
@@ -661,6 +842,8 @@ export function initAIChatWindow(options = {}) {
         appendBubble,
         focusInput: () => storyInput.focus(),
         resetInput: limitTwoLines,
+        lockInput: () => setInputDisabled(true),
+        unlockInput: () => setInputDisabled(false),
         replaceHistory(entries = []) {
             storyLog.innerHTML = "";
             continueBtn = null;
@@ -697,8 +880,24 @@ export function initAIChatWindow(options = {}) {
         showTimelineToast: showToast,
         beginAiReplyGroup,
         endAiReplyGroup,
-        updateBubble
+        updateBubble,
+        setGenerationState: setUiLocked
     };
+
+    function applyPlaceholderState(node, entry = {}) {
+        if (!node) return;
+        const meta = entry.meta || {};
+        const isPlaceholder = node.dataset.placeholder === "true" || Boolean(meta.placeholder);
+        const variant = meta.placeholderVariant || node.dataset.placeholderVariant || "";
+        node.classList.toggle("ai-placeholder", isPlaceholder);
+        node.classList.toggle("ai-placeholder-active", isPlaceholder && meta.loading !== false && !meta.error);
+        node.classList.toggle("ai-placeholder-error", isPlaceholder && Boolean(meta.error));
+        if (variant && isPlaceholder) {
+            node.dataset.placeholderVariant = variant;
+        } else if (!isPlaceholder) {
+            node.removeAttribute("data-placeholder-variant");
+        }
+    }
 
     function applyBubbleSpacing(node, meta = {}) {
         if (!node) return;

@@ -1,4 +1,4 @@
-import { getState, appendMessage, markWindowOpened, addWindow, updateRole } from "../state.js";
+import { getState, appendMessage, markWindowOpened, addWindow, updateRole, updateWindowSummary } from "../state.js";
 import { navigateTo } from "./nav.js";
 
 export function renderChat(root, params) {
@@ -19,15 +19,22 @@ export function renderChat(root, params) {
     const wrap = document.createElement("div");
     wrap.className = "legacy-chat-shell";
     wrap.innerHTML = `
-        <div class="chat-floating-head">
-            <button class="chat-head-pill" data-act="back" aria-label="返回聊天列表">
-                <span class="pill-text">
-                    <span class="pill-role">
-                        <span class="pill-role-text">${role.name}</span>
-                        <span class="pill-role-exit">退出</span>
+        <div class="chat-floating-head collapsed">
+            <div class="chat-head-main">
+                <button class="chat-head-pill" data-act="back" aria-label="返回聊天列表">
+                    <span class="pill-text">
+                        <span class="pill-role">
+                            <span class="pill-role-text">${role.name}</span>
+                            <span class="pill-role-exit">退出</span>
+                        </span>
                     </span>
-                </span>
-            </button>
+                </button>
+                <span class="chat-head-divider" aria-hidden="true"></span>
+                <div class="chat-head-subtitle" title="${win.title}">
+                    <span class="chat-head-sub-label">窗口</span>
+                    <span class="chat-head-sub-text">${win.title}</span>
+                </div>
+            </div>
         </div>
         <div class="chat-single"></div>
     `;
@@ -46,14 +53,28 @@ export function renderChat(root, params) {
 
     const goBack = () => navigateTo("#/messages");
     const backBtn = wrap.querySelector("[data-act='back']");
+    const headWrap = wrap.querySelector(".chat-floating-head");
+    let collapseTimer = null;
+    const isExpanded = () => !(headWrap?.classList.contains("collapsed"));
+    const scheduleCollapse = () => {
+        if (!headWrap) return;
+        clearTimeout(collapseTimer);
+        collapseTimer = setTimeout(() => headWrap.classList.add("collapsed"), 3000);
+    };
+    const setExpanded = (on) => {
+        if (!headWrap) return;
+        clearTimeout(collapseTimer);
+        headWrap.classList.toggle("collapsed", !on);
+        if (on) scheduleCollapse();
+    };
     backBtn?.addEventListener("click", goBack);
     const toggleExit = (on) => {
         if (!backBtn) return;
         backBtn.classList.toggle("show-exit", !!on);
     };
-    backBtn?.addEventListener("pointerenter", () => toggleExit(true));
+    backBtn?.addEventListener("pointerenter", () => { toggleExit(true); setExpanded(true); });
     backBtn?.addEventListener("pointerleave", () => toggleExit(false));
-    backBtn?.addEventListener("pointerdown", () => toggleExit(true));
+    backBtn?.addEventListener("pointerdown", () => { toggleExit(true); setExpanded(true); });
     backBtn?.addEventListener("pointerup", () => toggleExit(false));
 
     const forwardInput = (text) => {
@@ -64,6 +85,10 @@ export function renderChat(root, params) {
     const onMessage = (event) => {
         if (event?.data?.type === "user-input" && event.data.text) {
             forwardInput(event.data.text);
+            return;
+        }
+        if (event?.data?.type === "window-summary" && event.data.windowId) {
+            updateWindowSummary(event.data.windowId, event.data.summary || {});
             return;
         }
         if (event?.data?.type === "shell:new-window") {
@@ -79,12 +104,19 @@ export function renderChat(root, params) {
             const patch = {
                 name: payload.name,
                 bio: payload.bio,
+                publicProfile: payload.publicProfile,
                 opener: payload.opener,
-                persona: payload.persona,
-                worldview: payload.worldview || payload.worldLore,
-                storyline: payload.storyline,
-                rules: payload.rules,
-                profile: payload.profile
+                sex: payload.sex,
+                aboSub: payload.aboSub,
+                height: payload.height,
+                species: payload.species,
+                appearance: payload.appearance,
+                personality: payload.personality,
+                personaStyle: payload.personaStyle || payload.persona,
+                background: payload.background || payload.worldview || payload.worldLore,
+                family: payload.family,
+                aiProfile: payload.aiProfile || payload.profile,
+                replyRules: payload.replyRules || payload.rules
             };
             if (payload.color) patch.color = payload.color;
             Object.keys(patch).forEach(key => patch[key] === undefined && delete patch[key]);
@@ -119,6 +151,16 @@ export function renderChat(root, params) {
         }
     });
     window.addEventListener("message", onMessage);
+    root.addEventListener("pointerdown", (e) => {
+        if (headWrap?.contains(e.target)) {
+            setExpanded(true);
+            return;
+        }
+        setExpanded(false);
+    });
+    headWrap?.addEventListener("click", () => setExpanded(!isExpanded()));
+    headWrap?.addEventListener("pointerenter", () => setExpanded(true));
+    scheduleCollapse();
 
     const shell = document.getElementById("app-shell");
     shell?.classList.add("fullscreen");
@@ -166,6 +208,7 @@ export function renderChat(root, params) {
             root.removeEventListener("touchstart", onTouchStart);
             root.removeEventListener("touchend", onTouchEnd);
             document.body.classList.remove("chat-fullscreen");
+            clearTimeout(collapseTimer);
         }
     };
 }

@@ -1,0 +1,31 @@
+@import url("../tokens.css");
+
+.ui-chip-group {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--ui-space-8);
+}
+
+.ui-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ui-space-6);
+    padding: var(--ui-space-6) var(--ui-space-10);
+    border-radius: var(--ui-radius-md);
+    border: 1px solid var(--ui-border);
+    background: var(--ui-surface-0);
+    color: var(--ui-text-strong);
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.ui-chip:hover {
+    border-color: var(--ui-border-strong);
+    background: var(--ui-surface-1);
+}
+
+.ui-chip[aria-pressed="true"],
+.ui-chip.active {
+    background: color-mix(in srgb, var(--ui-accent) 18%, transparent);
+    border-color: color-mix(in srgb, var(--ui-accent) 42%, transparent);
+}

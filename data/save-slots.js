@@ -4,6 +4,7 @@ import { getShortMemory, hydrateShortMemory } from "./memory-short.js";
 import { getSystemRules, updateSystemRules } from "./system-rules.js";
 import { getActiveCard, setActiveCard, listCharacterCards } from "./character-cards.js";
 import { getPersonaMemory, loadPersonaMemory } from "./memory-persona.js";
+import { getWindowId } from "../core/window-context.js";
 
 const SLOT_KEYS = ["yuan-phone:slot:1", "yuan-phone:slot:2", "yuan-phone:slot:3"];
 
@@ -35,18 +36,27 @@ function resolveRole(roleId) {
     return { id: roleId, name: roleId };
 }
 
-function slotKey(index, roleId) {
+function currentWindowId(explicitId = null) {
+    try {
+        return explicitId || getWindowId();
+    } catch {
+        return explicitId || "win-default";
+    }
+}
+
+function slotKey(index, roleId, windowId = null) {
     const base = SLOT_KEYS[index - 1];
     if (!base) return { key: "", legacy: "" };
     const safeRole = sanitizeRoleId(roleId);
+    const scopedWindow = sanitizeRoleId(currentWindowId(windowId));
     return {
-        key: `${base}:${safeRole}`,
+        key: `${base}:${scopedWindow}:${safeRole}`,
         legacy: base
     };
 }
 
-function readPayload(store, index, roleId) {
-    const { key, legacy } = slotKey(index, roleId);
+function readPayload(store, index, roleId, windowId = null) {
+    const { key, legacy } = slotKey(index, roleId, windowId);
     if (!key && !legacy) return null;
     let raw = store.getItem(key);
     // 仅为默认角色兼容旧存档
@@ -56,29 +66,31 @@ function readPayload(store, index, roleId) {
     if (!raw) return null;
     try {
         const parsed = JSON.parse(raw);
-        return parsed ? { ...parsed, slotKey: key } : null;
+        return parsed ? { ...parsed, slotKey: key, windowId: windowId || parsed.windowId } : null;
     } catch {
         return null;
     }
 }
 
-export function saveSlot(index = 1, roleId = null) {
+export function saveSlot(index = 1, roleId = null, windowId = null) {
     const store = storage();
     if (!store) return;
     const { id, name } = resolveRole(roleId);
-    const { key, legacy } = slotKey(index, id);
+    const scopedWindow = currentWindowId(windowId);
+    const { key, legacy } = slotKey(index, id, scopedWindow);
     if (!key) return;
-    const prev = readPayload(store, index, id);
+    const prev = readPayload(store, index, id, scopedWindow);
     const payload = {
         savedAt: Date.now(),
         roleId: id,
         roleName: name,
         slotName: prev?.slotName || `槽位 ${index}`,
+        windowId: scopedWindow,
         worldState: getWorldState(),
         memoryLong: getLongMemory(),
         memoryShort: getShortMemory(),
         systemRules: getSystemRules(),
-        personaMemory: getPersonaMemory(),
+        personaMemory: getPersonaMemory({ windowId: scopedWindow, characterId: id }),
         activeCardId: id,
         turns: countUserMessages(getWorldState())
     };
@@ -92,17 +104,18 @@ export function saveSlot(index = 1, roleId = null) {
     }
 }
 
-export function loadSlot(index = 1, roleId = null) {
+export function loadSlot(index = 1, roleId = null, windowId = null) {
     const store = storage();
     if (!store) return null;
     const { id } = resolveRole(roleId);
-    const payload = readPayload(store, index, id);
+    const scopedWindow = currentWindowId(windowId);
+    const payload = readPayload(store, index, id, scopedWindow);
     if (!payload) return null;
     try {
         if (payload.worldState) setWorldState(payload.worldState);
         if (payload.memoryLong) loadLongMemory(payload.memoryLong);
         if (payload.memoryShort) hydrateShortMemory(payload.memoryShort);
-        if (payload.personaMemory) loadPersonaMemory(payload.personaMemory);
+        if (payload.personaMemory) loadPersonaMemory(payload.personaMemory, { windowId: scopedWindow, characterId: payload.roleId || id });
         if (payload.systemRules) updateSystemRules(payload.systemRules);
         if (payload.activeCardId) setActiveCard(payload.activeCardId);
         return payload;
@@ -112,11 +125,11 @@ export function loadSlot(index = 1, roleId = null) {
     }
 }
 
-export function deleteSlot(index = 1, roleId = null) {
+export function deleteSlot(index = 1, roleId = null, windowId = null) {
     const store = storage();
     if (!store) return;
     const { id } = resolveRole(roleId);
-    const { key, legacy } = slotKey(index, id);
+    const { key, legacy } = slotKey(index, id, currentWindowId(windowId));
     if (!key) return;
     store.removeItem(key);
     if (id === "default" && legacy) {
@@ -124,14 +137,15 @@ export function deleteSlot(index = 1, roleId = null) {
     }
 }
 
-export function renameSlot(index = 1, name = "", roleId = null) {
+export function renameSlot(index = 1, name = "", roleId = null, windowId = null) {
     const store = storage();
     if (!store) return null;
     const { id } = resolveRole(roleId);
-    const payload = readPayload(store, index, id);
+    const scopedWindow = currentWindowId(windowId);
+    const payload = readPayload(store, index, id, scopedWindow);
     if (!payload) return null;
     const label = name.trim() || `槽位 ${index}`;
-    const key = slotKey(index, id).key;
+    const key = slotKey(index, id, scopedWindow).key;
     if (!key) return null;
     const next = { ...payload, slotName: label };
     try {
@@ -147,10 +161,18 @@ export function listSlots(roleId = null) {
     const store = storage();
     if (!store) return [];
     const { id, name } = resolveRole(roleId);
+    const scopedWindow = currentWindowId();
     return SLOT_KEYS.map((_, idx) => {
-        const payload = readPayload(store, idx + 1, id);
+        const payload = readPayload(store, idx + 1, id, scopedWindow);
         if (!payload) {
-            return { index: idx + 1, empty: true, slotName: `槽位 ${idx + 1}`, roleId: id, roleName: name };
+            return {
+                index: idx + 1,
+                empty: true,
+                slotName: `槽位 ${idx + 1}`,
+                roleId: id,
+                roleName: name,
+                windowId: scopedWindow
+            };
         }
         return {
             index: idx + 1,
@@ -159,6 +181,7 @@ export function listSlots(roleId = null) {
             slotName: payload.slotName || `槽位 ${idx + 1}`,
             roleId: payload.roleId || id,
             roleName: payload.roleName || name,
+            windowId: payload.windowId || scopedWindow,
             turns: typeof payload.turns === "number" ? payload.turns : countUserMessages(payload.worldState)
         };
     });

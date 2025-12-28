@@ -1,35 +1,69 @@
-const GROQ_PROVIDER = {
-    id: "groq",
-    label: "Groq",
-    apiKey: "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",
-    apiBase: "https://api.groq.com/openai/v1/chat/completions",
-    PRIMARY_STORY_MODEL: "llama3-70b-8192",
-    CHEAP_SUMMARIZER_MODEL: "gemma2-9b-it",
-    ROUTER_MODEL: "llama3-8b-8192",
-    PHONE_MODEL: "llama3-8b-8192",
-    storyModel: "llama3-70b-8192",
-    memoryModel: "gemma2-9b-it",
-    phoneModel: "llama3-8b-8192"
+const GROK_PROVIDER = {
+    id: "grok",
+    label: "Grok",
+    kind: "local",
+    narratorModel: "qwen2.5:14b",
+    setupAssistantModel: "qwen2.5:7b",
+    summarizerModel: "llama3.1:8b",
+    matcherModel: "llama3.1:8b",
+    storyModel: "qwen2.5:14b",
+    utilityModel: "local-utility",
+    systemModel: "local-system"
+};
+
+const CLAUDE_PROVIDER = {
+    id: "claude",
+    label: "Claude",
+    kind: "local",
+    narratorModel: "qwen2.5:14b",
+    setupAssistantModel: "qwen2.5:7b",
+    summarizerModel: "llama3.1:8b",
+    matcherModel: "llama3.1:8b",
+    storyModel: "qwen2.5:14b",
+    utilityModel: "local-utility",
+    systemModel: "local-system"
+};
+
+const GEMINI_PROVIDER = {
+    id: "gemini",
+    label: "Gemini",
+    kind: "local",
+    narratorModel: "qwen2.5:14b",
+    setupAssistantModel: "qwen2.5:7b",
+    summarizerModel: "llama3.1:8b",
+    matcherModel: "llama3.1:8b",
+    storyModel: "qwen2.5:14b",
+    utilityModel: "local-utility",
+    systemModel: "local-system"
 };
 
 export const AI_PROVIDERS = [
-    GROQ_PROVIDER
+    GROK_PROVIDER,
+    GEMINI_PROVIDER,
+    CLAUDE_PROVIDER
 ];
 
 export const AI_CONFIG = {
-    defaultProvider: GROQ_PROVIDER.id,
-    PRIMARY_STORY_MODEL: GROQ_PROVIDER.PRIMARY_STORY_MODEL,
-    CHEAP_SUMMARIZER_MODEL: GROQ_PROVIDER.CHEAP_SUMMARIZER_MODEL,
-    ROUTER_MODEL: GROQ_PROVIDER.ROUTER_MODEL,
-    PHONE_MODEL: GROQ_PROVIDER.PHONE_MODEL,
-    storyModel: GROQ_PROVIDER.storyModel,
-    memoryModel: GROQ_PROVIDER.memoryModel,
-    phoneModel: GROQ_PROVIDER.phoneModel,
-    systemPrompt: `你是元书，恶念形成的黑雾。
-永远根据 GameState（用户本地存储的记忆状态）进行推理。
-禁止虚构不存在的剧情。
-禁止遗忘 GameState。
-你可以读取聊天、朋友圈、钱包、通话记录和触发器。
-在必要时你可以告诉前端执行动作：推送通知、显示未读、来电。
-当你需要角色直接开口，请使用 #D 前缀，保持对白短促、冷感、带压迫。`.trim()
+    defaultProvider: GROK_PROVIDER.id,
+    narratorModel: "qwen2.5:14b",
+    narratorModels: ["qwen2.5:14b", "qwen2.5:7b", "llama3.1:8b"],
+    summarizerModel: "llama3.1:8b",
+    matcherModel: "llama3.1:8b",
+    setupAssistantModel: "qwen2.5:7b",
+    initializerModel: "qwen2.5:7b",
+    roleRouting: {
+        story: { defaultProvider: GROK_PROVIDER.id, modelKey: "narratorModel" },
+        utility: { defaultProvider: GROK_PROVIDER.id, modelKey: "utilityModel" },
+        system: { defaultProvider: GROK_PROVIDER.id, modelKey: "systemModel" },
+        setup: { defaultProvider: GROK_PROVIDER.id, modelKey: "setupAssistantModel" },
+        initializer: { defaultProvider: GROK_PROVIDER.id, modelKey: "initializerModel" }
+    },
+    PRIMARY_STORY_MODEL: "qwen2.5:14b",
+    CHEAP_SUMMARIZER_MODEL: "llama3.1:8b",
+    ROUTER_MODEL: "local-system",
+    PHONE_MODEL: "local-utility",
+    storyModel: "qwen2.5:14b",
+    memoryModel: "llama3.1:8b",
+    phoneModel: "local-utility",
+    systemPrompt: ""
 };

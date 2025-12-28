@@ -73,15 +73,26 @@ function showHome() {
 }
 
 function openPage(id) {
-    if (!homeScreen) return;
+    if (!homeScreen) {
+        homeScreen = document.getElementById("home-screen");
+    }
+    if (!appPages || !appPages.length) {
+        appPages = Array.from(document.querySelectorAll(".app-page"));
+    }
     homeScreen.style.display = "none";
+    let targetFound = false;
     appPages.forEach(page => {
-        if (page.id === id) {
-            page.style.display = "flex";
-        } else {
-            page.style.display = "none";
-        }
+        const isTarget = page.id === id;
+        page.style.display = isTarget ? "flex" : "none";
+        if (isTarget) targetFound = true;
     });
+    if (!targetFound) {
+        const page = document.getElementById(id);
+        if (page) {
+            appPages.push(page);
+            page.style.display = "flex";
+        }
+    }
     const scroll = document.querySelector(`#${id} .app-scroll`);
     if (scroll) scroll.scrollTop = 0;
     recordAppOpen(id);
@@ -246,7 +257,9 @@ function updateLayoutMode() {
         body.classList.remove("mobile-mode");
         body.classList.add("pc-mode");
         phoneLayer?.classList.remove("show");
-        body.classList.remove("phone-open");
+        if (phoneVisible === false) {
+            setPhoneVisible(true);
+        }
     } else {
         body.classList.add("mobile-mode");
         body.classList.remove("pc-mode");

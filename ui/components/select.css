@@ -1,0 +1,54 @@
+@import url("../tokens.css");
+
+.ui-select {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    gap: var(--ui-space-6);
+    min-width: 160px;
+}
+
+.ui-select-trigger {
+    width: 100%;
+    justify-content: space-between;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.ui-select-menu {
+    position: absolute;
+    top: calc(100% + var(--ui-space-6));
+    left: 0;
+    right: 0;
+    padding: var(--ui-space-6);
+    border-radius: var(--ui-radius-md);
+    border: 1px solid var(--ui-border);
+    background: var(--ui-surface-1);
+    box-shadow: var(--ui-shadow-soft);
+    list-style: none;
+    margin: 0;
+    z-index: var(--ui-z-popover);
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.ui-select-menu[hidden] {
+    display: none;
+}
+
+.ui-select-option {
+    padding: var(--ui-space-8) var(--ui-space-10);
+    border-radius: var(--ui-radius-sm);
+    cursor: pointer;
+    color: var(--ui-text-strong);
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+.ui-select-option:hover {
+    background: color-mix(in srgb, var(--ui-accent) 16%, transparent);
+}
+
+.ui-select-option[data-disabled="1"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

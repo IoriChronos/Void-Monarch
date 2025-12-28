@@ -1,9 +1,12 @@
-import { getSeedState, updateWorldState, initializeWorldState } from "../data/world-state.js";
+import { getSeedState, updateWorldState, initializeWorldState, getWorldState, addStoryMessage } from "../data/world-state.js";
 import { hydrateShortMemory, clearShortMemory } from "../data/memory-short.js";
 import { loadLongMemory, clearMemory as clearLongMemory } from "../data/memory-long.js";
 import { clearSystemRules } from "../data/system-rules.js";
 import { saveWorldStateSnapshot, saveLongMemorySnapshot } from "./storage.js";
 import { clearSnapshots } from "./timeline.js";
+import { getOpeningText, resetWindowMemoryForStory, setOpeningText } from "../data/window-memory.js";
+import { getWindowId } from "./window-context.js";
+import { getActiveCard } from "../data/character-cards.js";
 
 function clone(value) {
     if (typeof window !== "undefined" && window.structuredClone) {
@@ -20,13 +23,43 @@ function replaceArray(target, source) {
     });
 }
 
-export function resetStory() {
+function resolveOpeningText(scopedWindow) {
+    const existing = (getOpeningText(scopedWindow) || "").trim();
+    if (existing) return existing;
+    const current = getWorldState();
     const seed = getSeedState();
+    const findOpening = (list = []) => {
+        const entry = (list || []).find(item => item.meta?.opening && (!item.meta.windowId || item.meta.windowId === scopedWindow));
+        return (entry?.text || "").trim();
+    };
+    const fromStory = findOpening(current.story || []);
+    if (fromStory) return fromStory;
+    const fromSeed = findOpening(seed.story || []);
+    if (fromSeed) return fromSeed;
+    const card = getActiveCard?.();
+    const fromCard = (card?.opener || "").trim();
+    if (fromCard) return fromCard;
+    console.error("[Reset] opening text missing", { windowId: scopedWindow });
+    return "（缺少开场白）";
+}
+
+export function resetStory() {
+    const scopedWindow = getWindowId();
+    const openingText = resolveOpeningText(scopedWindow);
+    if (openingText) {
+        setOpeningText(openingText, scopedWindow);
+    }
     updateWorldState(state => {
-        state.story = seed.story.map(entry => ({ ...entry }));
+        state.story = [];
     }, "reset:story");
-    hydrateShortMemory(seed.story);
+    clearShortMemory();
+    clearLongMemory();
+    resetWindowMemoryForStory(scopedWindow);
+    hydrateShortMemory([]);
     loadLongMemory([]);
+    if (openingText) {
+        addStoryMessage("system", openingText, { meta: { opening: true, windowId: scopedWindow } });
+    }
     saveWorldStateSnapshot();
     saveLongMemorySnapshot([]);
 }
@@ -53,13 +86,23 @@ export function resetPhone() {
 export function resetAll() {
     const seed = getSeedState();
     const base = clone(seed);
+    const scopedWindow = getWindowId();
+    const openingText = resolveOpeningText(scopedWindow);
     clearSnapshots();
     clearShortMemory();
     clearLongMemory();
+    resetWindowMemoryForStory(scopedWindow);
     initializeWorldState(base);
-    hydrateShortMemory(seed.story);
+    updateWorldState(state => {
+        state.story = [];
+    }, "reset:story");
+    hydrateShortMemory([]);
     loadLongMemory([]);
     clearSystemRules();
+    if (openingText) {
+        setOpeningText(openingText, scopedWindow);
+        addStoryMessage("system", openingText, { meta: { opening: true, windowId: scopedWindow } });
+    }
     saveWorldStateSnapshot();
     saveLongMemorySnapshot([]);
 }

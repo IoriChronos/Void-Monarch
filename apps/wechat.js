@@ -15,6 +15,7 @@ import {
     postMoment as worldPostMoment,
     deleteMoment,
     likeMoment as worldLikeMoment,
+    setMomentVisibility,
     commentMoment as worldCommentMoment,
     appendSystemMessage,
     sendTransfer as walletSendTransfer,
@@ -54,12 +55,15 @@ export function initWeChatApp() {
     const momentsFeed = document.getElementById("wechat-moments-feed");
     const momentComposerInput = document.getElementById("moment-composer-input");
     const momentComposerSend = document.getElementById("moment-composer-send");
+    const momentComposerActions = document.querySelector(".moment-composer-actions");
+    const momentVisibilityDefault = getState("momentVisibilityDays") || 7;
+    let momentVisibilityDays = momentVisibilityDefault;
     const chatActionsToggle = document.getElementById("chat-actions-toggle");
     const chatActionsPanel = document.getElementById("chat-actions-panel");
     const chatActionsButtons = document.getElementById("chat-actions-buttons");
     const chatActionButtons = document.querySelectorAll("[data-chataction]");
     const chatActionForm = document.getElementById("chat-action-form");
-    const chatActionDisplay = document.getElementById("chat-action-display");
+    let chatActionDisplay = document.getElementById("chat-action-display");
     const chatActionKeypad = document.getElementById("chat-action-keypad");
     const chatActionConfirm = document.getElementById("chat-action-confirm");
     const chatActionCancel = document.getElementById("chat-action-cancel");
@@ -88,6 +92,12 @@ export function initWeChatApp() {
     updateMomentsBadgeDisplay(unreadMomentsCount);
     const momentNotifications = [];
     let pendingMomentDelete = null;
+    const visibilityOptions = [
+        { value: 1, label: "1天" },
+        { value: 3, label: "3天" },
+        { value: 7, label: "7天" },
+        { value: "self", label: "仅自己" }
+    ];
 
     const chatMenuBtn = document.getElementById("chat-menu-btn");
     const chatHeadMenu = document.getElementById("chat-head-menu");
@@ -227,9 +237,9 @@ export function initWeChatApp() {
     }
 
     function pickMomentForEvent(momentId, requirePlayerAuthor = false) {
-        const pool = requirePlayerAuthor
+        const pool = (requirePlayerAuthor
             ? moments.filter(m => ensureMomentAuthor(m) === PLAYER_ID)
-            : moments.slice();
+            : moments.slice()).filter(m => !m.deleted);
         if (!pool.length) return null;
         if (momentId) {
             const found = pool.find(m => m.id === momentId);
@@ -709,7 +719,7 @@ export function initWeChatApp() {
     }
 
     const walletActions = [
-        "转账", "收款", "红包", "扫一扫",
+        "转账", "收款", "零钱包", "扫一扫",
         "卡包", "乘车码", "生活缴费", "更多"
     ];
 
@@ -780,7 +790,12 @@ export function initWeChatApp() {
         if (!wrap) return;
         wrap.innerHTML = "";
         const mentionContacts = getMentionContacts();
-        moments.forEach(m => {
+        const helper = document.createElement("div");
+        helper.className = "moment-visibility-tip";
+        helper.textContent = "可见性决定 AI 可读取的朋友圈范围，不影响你自己查看历史";
+        wrap.appendChild(helper);
+        const visibleMoments = moments.filter(m => !m.deleted);
+        visibleMoments.forEach(m => {
             ensureMomentAuthor(m);
             const div = document.createElement("div");
             div.className = "moment-card";
@@ -799,6 +814,15 @@ export function initWeChatApp() {
                     <button data-act="mention">@联系人</button>
                 </div>
             `;
+            const actionsEl = div.querySelector(".moment-actions");
+            const meta = div.querySelector(".moment-meta");
+            if (meta && m.createdAt) {
+                const real = document.createElement("span");
+                const dt = new Date(m.createdAt);
+                real.className = "moment-real-time";
+                real.textContent = dt.toLocaleString();
+                meta.appendChild(real);
+            }
             div.querySelector('[data-act="like"]').addEventListener("click", () => {
                 toggleOwnMomentLike(m);
             });
@@ -844,7 +868,6 @@ export function initWeChatApp() {
             div.appendChild(commentPanel);
             const commentBtn = div.querySelector('[data-act="comment"]');
             const mentionBtn = div.querySelector('[data-act="mention"]');
-            const actionsEl = div.querySelector(".moment-actions");
             const togglePanel = (show) => {
                 const next = typeof show === "boolean" ? show : !commentPanel.classList.contains("show");
                 commentPanel.classList.toggle("show", next);
@@ -911,18 +934,18 @@ export function initWeChatApp() {
 
     function publishMoment(text) {
         if (!text) return;
-        worldPostMoment(text, [], PLAYER_ID);
+        worldPostMoment(text, [], PLAYER_ID, momentVisibilityDays);
         renderMoments();
     }
 
     function toggleOwnMomentLike(moment) {
-        if (!moment) return;
+        if (!moment || moment.deleted) return;
         worldLikeMoment(moment.id, PLAYER_ID, !moment.likedByUser);
         renderMoments();
     }
 
     function registerExternalMomentLike(moment, likerId) {
-        if (!moment) return;
+        if (!moment || moment.deleted) return;
         worldLikeMoment(moment.id, likerId, true);
         renderMoments();
         handleMomentNotification("like", {
@@ -935,14 +958,72 @@ export function initWeChatApp() {
 
     function renderWallet() {
         const wrap = document.getElementById("wallet-actions");
-        if (!wrap) return;
+        const walletPanel = document.getElementById("wechat-wallet");
+        if (!wrap || !walletPanel) return;
         wrap.innerHTML = "";
         walletActions.forEach(a => {
             const btn = document.createElement("div");
             btn.className = "wallet-btn";
             btn.textContent = a;
+            if (a === "零钱包") {
+                btn.addEventListener("click", () => toggleWalletDetail(walletPanel));
+            }
             wrap.appendChild(btn);
         });
+        const sub = document.querySelector(".wallet-balance .sub");
+        const walletState = getState("phone.wallet") || getState("wallet") || {};
+        const events = walletState.events || [];
+        const latest = events[0];
+        if (sub && latest) {
+            const sign = latest.type === "expense" ? "-" : "+";
+            const amt = (latest.amount || 0).toFixed(2);
+            sub.textContent = `最近变动：${sign}¥${amt} · ${latest.source || "记录"}`;
+        } else if (sub) {
+            sub.textContent = "最近变动：暂无记录";
+        }
+        const logList = document.getElementById("wallet-events");
+        if (logList && logList.remove) logList.remove();
+    }
+
+    function toggleWalletDetail(walletPanel) {
+        if (!walletPanel) return;
+        let detail = walletPanel.querySelector("#wallet-inline-detail");
+        if (!detail) {
+            detail = document.createElement("div");
+            detail.id = "wallet-inline-detail";
+            detail.className = "wallet-inline-detail";
+            walletPanel.appendChild(detail);
+        }
+        const walletState = getState("phone.wallet") || getState("wallet") || {};
+        const events = walletState.events || [];
+        const balance = walletState.balance ?? walletBalance ?? 0;
+        const recent = events.slice(0, 4);
+        detail.innerHTML = `
+            <h4>零钱</h4>
+            <div class="wallet-inline-balance">¥${(balance || 0).toFixed(2)}</div>
+            <ul class="wallet-inline-list">
+                ${
+                    recent.length
+                        ? recent.map(ev => {
+                            const sign = ev.type === "expense" ? "-" : "+";
+                            const amt = (ev.amount || 0).toFixed(2);
+                            return `<li><span>${ev.source || "记录"}</span><em>${sign}¥${amt}</em></li>`;
+                        }).join("")
+                        : "<li class=\"empty\">暂无流水</li>"
+                }
+            </ul>
+            <div class="wallet-inline-actions">
+                <button class="ui-btn ui-ghost" data-act="withdraw" type="button">提现</button>
+                <button class="ui-btn ui-ghost" data-act="deposit" type="button">充值</button>
+            </div>
+        `;
+        detail.querySelectorAll(".wallet-inline-actions button").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const sub = document.querySelector(".wallet-balance .sub");
+                if (sub) sub.textContent = btn.dataset.act === "withdraw" ? "提现申请已创建" : "充值入口待接入";
+            });
+        });
+        detail.classList.toggle("show");
     }
 
     function isChatActive(id) {
@@ -986,6 +1067,33 @@ export function initWeChatApp() {
             switchTab(btn.dataset.wtab);
         });
     });
+
+    if (momentComposerActions) {
+        const visWrap = document.createElement("div");
+        visWrap.className = "moment-visibility-row";
+        const label = document.createElement("span");
+        label.className = "moment-visibility-label";
+        label.textContent = "可见天数";
+        const select = document.createElement("select");
+        select.className = "moment-visibility-select";
+        visibilityOptions.forEach(opt => {
+            const option = document.createElement("option");
+            option.value = String(opt.value);
+            option.textContent = opt.label;
+            select.appendChild(option);
+        });
+        select.value = String(momentVisibilityDays);
+        select.addEventListener("change", () => {
+            const raw = select.value;
+            momentVisibilityDays = raw === "self" ? "self" : Number(raw) || 7;
+            updateState("momentVisibilityDays", momentVisibilityDays);
+            moments.forEach(m => setMomentVisibility(m.id, momentVisibilityDays));
+            renderMoments();
+        });
+        visWrap.appendChild(label);
+        visWrap.appendChild(select);
+        momentComposerActions.insertBefore(visWrap, momentComposerActions.firstChild);
+    }
 
     function openChat(id) {
         const c = getAllChats().find(x => x.id === id);
@@ -1051,16 +1159,37 @@ export function initWeChatApp() {
         if (!chatActionsOpen) closeChatActionForm();
     }
 
+    function ensureChatActionInput() {
+        if (chatActionDisplay && chatActionDisplay.tagName === "INPUT") return;
+        const replacement = document.createElement("input");
+        replacement.type = "number";
+        replacement.step = "0.01";
+        replacement.min = "0";
+        replacement.id = "chat-action-display";
+        replacement.className = "chat-action-display";
+        replacement.placeholder = "金额";
+        replacement.addEventListener("input", () => {
+            const num = parseFloat(replacement.value);
+            chatActionValue = Number.isNaN(num) ? "" : replacement.value;
+        });
+        if (chatActionDisplay && chatActionDisplay.parentNode) {
+            chatActionDisplay.parentNode.replaceChild(replacement, chatActionDisplay);
+        }
+        chatActionDisplay = replacement;
+    }
+
     function openChatActionForm(type) {
         if (!chatActionForm || !chatActionsButtons) return;
         const preset = ACTION_PRESETS[type];
         if (!preset) return;
+        ensureChatActionInput();
         currentChatAction = { ...preset };
-        chatActionValue = preset.defaultValue.toFixed(2);
+        chatActionValue = "";
         chatActionsButtons.style.display = "none";
         chatActionForm.classList.add("show");
         updateChatActionDisplay();
         setChatActions(true);
+        chatActionDisplay?.focus();
     }
 
     function closeChatActionForm() {
@@ -1073,8 +1202,12 @@ export function initWeChatApp() {
     function updateChatActionDisplay() {
         if (!chatActionDisplay) return;
         const num = parseFloat(chatActionValue);
-        const formatted = !Number.isNaN(num) ? num.toFixed(2) : "0.00";
-        chatActionDisplay.textContent = `¥${formatted}`;
+        const formatted = !Number.isNaN(num) ? num.toFixed(2) : "";
+        if (chatActionDisplay.tagName === "INPUT") {
+            chatActionDisplay.value = formatted;
+        } else {
+            chatActionDisplay.textContent = formatted ? `¥${formatted}` : "金额";
+        }
     }
 
     function handleKeypadInput(key) {
@@ -1467,6 +1600,7 @@ export function initWeChatApp() {
             case "moments:post":
             case "moments:comment":
             case "moments:like":
+            case "moments:visibility":
                 renderMoments();
                 break;
             case "moments:delete":

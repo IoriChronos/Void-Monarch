@@ -1,0 +1,30 @@
+@import url("../tokens.css");
+
+#phone-layer .ui-page-header {
+    background: var(--ui-surface-0);
+    border-bottom: 1px solid var(--ui-border);
+    padding: var(--ui-space-10) var(--ui-space-12);
+}
+
+#phone-layer .ui-modal-backdrop {
+    padding: var(--ui-space-16);
+    align-items: center;
+}
+
+#phone-layer .ui-modal {
+    width: min(360px, 90vw);
+}
+
+#phone-layer .moment-composer .ui-input,
+#phone-layer .moment-composer .ui-btn {
+    width: 100%;
+}
+
+#phone-layer .wechat-body .ui-panel {
+    margin-bottom: var(--ui-space-10);
+}
+
+.chat-actions-panel {
+    border-top-left-radius: var(--ui-radius-md);
+    border-top-right-radius: var(--ui-radius-md);
+}

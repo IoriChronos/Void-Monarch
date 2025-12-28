@@ -1,14 +1,20 @@
 import { getWorldState } from "../data/world-state.js";
 import { getLongMemory, loadLongMemory } from "../data/memory-long.js";
 import { initState, subscribeState } from "./state.js";
+import { getWindowId } from "./window-context.js";
 
 const STORAGE_VERSION = 2;
 
 function slotSuffix() {
     if (typeof window === "undefined") return "";
-    const slot = window.__YUAN_SLOT__ || "";
-    if (!slot) return "";
-    return `:${slot}`;
+    try {
+        const slot = getWindowId();
+        return slot ? `:${slot}` : "";
+    } catch {
+        const slot = window.__YUAN_SLOT__ || "";
+        if (!slot) return "";
+        return `:${slot}`;
+    }
 }
 
 function storageKey(name) {
@@ -40,9 +46,10 @@ export function syncStateWithStorage() {
 
 export function saveWorldStateSnapshot(state = getWorldState()) {
     if (!storageAvailable()) return;
+    const data = trimWorldStateForPersist(state);
     const payload = {
         version: STORAGE_VERSION,
-        data: state
+        data
     };
     try {
         window.localStorage.setItem(storageKey("world"), JSON.stringify(payload));
@@ -167,4 +174,15 @@ function storageAvailable() {
     } catch {
         return false;
     }
+}
+
+function trimWorldStateForPersist(state) {
+    if (!state || !Array.isArray(state.story)) return state;
+    const MAX_STORY_SAVE = 800;
+    if (state.story.length <= MAX_STORY_SAVE) return state;
+    console.debug("[Storage] trim story before save", { total: state.story.length, saved: MAX_STORY_SAVE });
+    return {
+        ...state,
+        story: state.story.slice(-MAX_STORY_SAVE)
+    };
 }

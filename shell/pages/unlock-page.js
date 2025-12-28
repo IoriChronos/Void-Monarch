@@ -1,51 +1,69 @@
 import { unlock, getState } from "../state.js";
 import { navigateTo } from "./nav.js";
 
+const LOGIN_USER_KEY = "yuan-shell:login-user";
+const LOGIN_PWD_KEY = "yuan-shell:login-pass";
+const LOGIN_REMEMBER_KEY = "yuan-shell:login-remember";
+
 export function renderUnlock(root) {
     root.innerHTML = "";
     root.className = "unlock-page";
     const state = getState();
+    const saved = loadLoginPrefs();
     const gate = document.createElement("div");
     gate.className = "unlock-gate";
     gate.innerHTML = `
         <div class="unlock-anim">
             <div class="scan-lines"></div>
             <div class="glow-bar"></div>
-            <div class="pixel-stars">
-                <span></span><span></span><span></span>
-            </div>
+            <div class="pixel-stars"></div>
         </div>
         <div class="unlock-content">
             <p class="unlock-kicker">Login · ${state.user?.name || "USER"}</p>
             <h1>解锁世界</h1>
-            <p class="unlock-sub">输入口令 0715，开启故事与终端。动画播放完毕后可输入。</p>
+            <p class="unlock-sub">完成扫描后输入口令，开启故事与终端。</p>
             <form class="unlock-form">
-                <input type="password" placeholder="输入 0715" autocomplete="off" inputmode="numeric" />
+                <input type="text" placeholder="用户名" autocomplete="username" value="${saved.user || "沈安亦"}" data-field="user" />
+                <input type="password" placeholder="输入口令" autocomplete="current-password" value="${saved.remember ? saved.password : ""}" data-field="pass" />
+                <label class="unlock-remember">
+                    <input type="checkbox" data-field="remember" ${saved.remember ? "checked" : ""} />
+                    <span class="remember-text">记住密码</span>
+                </label>
                 <div class="unlock-actions">
                     <button type="submit" class="primary">解锁</button>
-                    <button type="button" class="ghost" data-skip>跳过动画</button>
+                    <button type="button" class="ghost" data-reset>清除记忆</button>
                 </div>
                 <div class="unlock-hint" aria-live="polite"></div>
             </form>
         </div>
     `;
     root.appendChild(gate);
+    scatterPixelStars(gate.querySelector(".pixel-stars"), 6);
 
     const form = gate.querySelector("form");
-    const input = gate.querySelector("input");
+    const inputUser = gate.querySelector("[data-field='user']");
+    const inputPass = gate.querySelector("[data-field='pass']");
+    const inputRemember = gate.querySelector("[data-field='remember']");
     const hint = gate.querySelector(".unlock-hint");
-    const skipBtn = gate.querySelector("[data-skip]");
+    const resetBtn = gate.querySelector("[data-reset]");
 
     let ready = false;
     const finishAnim = () => {
         if (gate.classList.contains("ready")) return;
         gate.classList.add("ready");
         ready = true;
-        input?.focus();
+        inputPass?.focus();
     };
     setTimeout(finishAnim, 900);
 
-    skipBtn?.addEventListener("click", () => finishAnim());
+    resetBtn?.addEventListener("click", () => {
+        clearSavedLogin();
+        if (inputUser) inputUser.value = "沈安亦";
+        if (inputPass) inputPass.value = "";
+        if (inputRemember) inputRemember.checked = false;
+        hint.textContent = "登录缓存已清除";
+        finishAnim();
+    });
 
     form?.addEventListener("submit", (ev) => {
         ev.preventDefault();
@@ -53,15 +71,93 @@ export function renderUnlock(root) {
             hint.textContent = "等待动画完成…";
             return;
         }
-        const val = input?.value?.trim();
+        const val = inputPass?.value?.trim();
         if (val !== "0715") {
             hint.textContent = "口令不正确";
             return;
         }
+        saveLoginPrefs({
+            user: inputUser?.value?.trim() || "沈安亦",
+            password: val,
+            remember: !!inputRemember?.checked
+        });
         unlock();
         hint.textContent = "解锁成功";
         setTimeout(() => navigateTo("#/home"), 220);
     });
 
     return { unmount() {} };
+}
+
+export function clearSavedLogin() {
+    try {
+        window.localStorage?.removeItem(LOGIN_USER_KEY);
+        window.localStorage?.removeItem(LOGIN_PWD_KEY);
+        window.localStorage?.removeItem(LOGIN_REMEMBER_KEY);
+    } catch {
+        /* ignore */
+    }
+}
+
+function loadLoginPrefs() {
+    try {
+        const remember = window.localStorage?.getItem(LOGIN_REMEMBER_KEY) === "1";
+        const user = window.localStorage?.getItem(LOGIN_USER_KEY) || "沈安亦";
+        const password = remember ? (window.localStorage?.getItem(LOGIN_PWD_KEY) || "") : "";
+        return { user, password, remember };
+    } catch {
+        return { user: "沈安亦", password: "", remember: false };
+    }
+}
+
+function saveLoginPrefs({ user = "沈安亦", password = "", remember = false } = {}) {
+    try {
+        window.localStorage?.setItem(LOGIN_USER_KEY, user);
+        if (remember) {
+            window.localStorage?.setItem(LOGIN_PWD_KEY, password);
+            window.localStorage?.setItem(LOGIN_REMEMBER_KEY, "1");
+        } else {
+            window.localStorage?.removeItem(LOGIN_PWD_KEY);
+            window.localStorage?.setItem(LOGIN_REMEMBER_KEY, "0");
+        }
+    } catch {
+        /* ignore */
+    }
+}
+
+function scatterPixelStars(container, count = 5) {
+    if (!container) return;
+    container.innerHTML = "";
+    for (let i = 0; i < count; i++) {
+        const star = document.createElement("span");
+        randomizeStar(star, true);
+        container.appendChild(star);
+        scheduleStarMove(star);
+    }
+}
+
+function randomizeStar(el, initial = false) {
+    const x = Math.random() * 100;
+    const y = Math.random() * 100;
+    const scale = 0.7 + Math.random() * 1.1;
+    const driftX = (Math.random() - 0.5) * 14;
+    const driftY = -8 - Math.random() * 8;
+    el.style.left = `${x}%`;
+    el.style.top = `${y}%`;
+    el.style.setProperty("--star-scale", scale.toFixed(2));
+    el.style.setProperty("--drift-x", `${driftX.toFixed(1)}px`);
+    el.style.setProperty("--drift-y", `${driftY.toFixed(1)}px`);
+    el.style.animationDelay = `${Math.random() * 1.6}s`;
+    if (initial) {
+        el.style.transition = "none";
+        requestAnimationFrame(() => el.style.transition = "");
+    }
+}
+
+function scheduleStarMove(star) {
+    const delay = 1200 + Math.random() * 2400;
+    setTimeout(() => {
+        randomizeStar(star);
+        scheduleStarMove(star);
+    }, delay);
 }

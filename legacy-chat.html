@@ -75,8 +75,8 @@
                         <div class="menu-head">高级联动</div>
                         <div class="menu-row">
                             <div class="provider-control">
-                                <span>Provider</span>
-                                <select id="ai-provider-select"></select>
+                                <span>Narrator Model</span>
+                                <select id="narrator-model-select"></select>
                             </div>
                         </div>
                         <div class="menu-row">
@@ -91,23 +91,33 @@
             </div>
             <button id="story-send" class="click-anim" >发送</button>
         </footer>
-        <div id="restart-sheet" class="restart-sheet" aria-hidden="true">
-            <div class="sheet-content">
-                <p>重启范围</p>
-                <button data-restart="story">重置剧情记忆</button>
-                <button data-restart="phone">重置手机数据</button>
-                <button data-restart="all">重置全部</button>
-                <button data-restart="cancel" class="ghost">取消</button>
+        <div id="restart-sheet" class="restart-sheet ui-modal-backdrop" aria-hidden="true">
+            <div class="sheet-content ui-modal">
+                <header class="ui-modal-header">
+                    <p>重启范围</p>
+                </header>
+                <section class="ui-modal-body">
+                    <button data-restart="story">重置剧情记忆</button>
+                    <button data-restart="phone">重置手机数据</button>
+                    <button data-restart="all">重置全部</button>
+                </section>
+                <footer class="ui-modal-footer">
+                    <button data-restart="cancel" class="ghost">取消</button>
+                </footer>
             </div>
         </div>
-        <div id="story-edit-sheet" class="story-edit-sheet" aria-hidden="true">
-            <div class="edit-panel">
-                <p>编辑 AI 回复</p>
-                <textarea id="story-edit-input" rows="4" placeholder="在这里修改这句回复…"></textarea>
-                <div class="edit-actions">
+        <div id="story-edit-sheet" class="story-edit-sheet ui-modal-backdrop" aria-hidden="true">
+            <div class="edit-panel ui-modal">
+                <header class="ui-modal-header">
+                    <p>编辑 AI 回复</p>
+                </header>
+                <section class="ui-modal-body">
+                    <textarea id="story-edit-input" rows="4" placeholder="在这里修改这句回复…"></textarea>
+                </section>
+                <footer class="edit-actions ui-modal-footer">
                     <button id="story-edit-save" type="button">保存修改</button>
                     <button id="story-edit-cancel" type="button" class="ghost">取消</button>
-                </div>
+                </footer>
             </div>
         </div>
     </section>
@@ -191,7 +201,7 @@
 
                 <!-- 微信页面 -->
                 <div id="wechat-page" class="app-page" style="display:none;">
-                    <div class="page-header">
+                    <div class="page-header ui-page-header">
                         <button class="back-home">‹</button>
                         <span id="wechat-top">Wechat (3)</span>
                         <button id="contacts-add-btn" class="contact-add-btn" aria-label="添加好友">＋</button>
@@ -308,7 +318,7 @@
 
                 <!-- 电话页面 -->
                 <div id="call-page" class="app-page" style="display:none;">
-                    <div class="page-header">
+                    <div class="page-header ui-page-header">
                         <button class="back-home">‹</button>
                     </div>
                     <div class="page-body app-scroll">
@@ -329,7 +339,7 @@
 
                 <!-- 黑雾页面 -->
                 <div id="darkfog-page" class="app-page" style="display:none;">
-                    <div class="page-header">
+                    <div class="page-header ui-page-header">
                         <button class="back-home">‹</button>
                         <span>黑雾</span>
                     </div>
@@ -340,7 +350,7 @@
 
                 <!-- 守望页面 -->
                 <div id="watch-page" class="app-page" style="display:none;">
-                    <div class="page-header">
+                    <div class="page-header ui-page-header">
                         <button class="back-home">‹</button>
                         <span>守望</span>
                     </div>
@@ -351,7 +361,7 @@
 
                 <!-- 备忘录页面 -->
                 <div id="memo-page" class="app-page" style="display:none;">
-                    <div class="page-header">
+                    <div class="page-header ui-page-header">
                         <button class="back-home">‹</button>
                         <span>备忘录</span>
                     </div>
@@ -365,7 +375,7 @@
 
                 <!-- 心率页面 -->
                 <div id="heart-page" class="app-page" style="display:none;">
-                    <div class="page-header">
+                    <div class="page-header ui-page-header">
                         <button class="back-home">‹</button>
                         <span>心率</span>
                     </div>
@@ -375,11 +385,11 @@
                 </div>
 
                 <!-- 设置页面 -->
-                <div id="settings-page" class="app-page" style="display:none;">
-                    <div class="page-header">
-                        <button class="back-home">‹</button>
-                    </div>
-                    <div class="page-body app-scroll">
+            <div id="settings-page" class="app-page" style="display:none;">
+                <div class="page-header ui-page-header">
+                    <button class="back-home">‹</button>
+                </div>
+                <div class="page-body app-scroll">
                         <div class="card-block">壁纸 · 默认</div>
                         <div class="card-block">AI 模型 · 待接入</div>
                         <div class="card-block">记忆清单 · 0 条</div>
@@ -387,7 +397,7 @@
                 </div>
                 <!-- 购物页面 -->
                 <div id="shopping-page" class="app-page" style="display:none;">
-                    <div class="page-header">
+                    <div class="page-header ui-page-header">
                         <button class="back-home">‹</button>
                         <span>购物</span>
                     </div>
@@ -397,32 +407,137 @@
                     </div>
                 </div>
                 <!-- 武侠（MMO）页面 -->
-                <div id="mmo-page" class="app-page" style="display:none;">
-                    <div class="page-header">
-                        <button class="back-home">‹</button>
-                        <span>侠客</span>
+            <div id="mmo-page" class="app-page" style="display:none;">
+                <div class="mmo-shell" data-state="login">
+                    <div class="mmo-login">
+                        <h2 class="mmo-title">燕云十六声</h2>
+                        <p class="mmo-sub">武侠像素世界 · 纯前端 Demo</p>
+                        <button class="ui-btn ui-primary" data-act="mmo-enter">点击进入游戏</button>
                     </div>
-                    <div class="page-body app-scroll">
-                        <p>MMO 框架已搭建，等待剧情与交互填充。</p>
-                        <p>可以在这里查看门派、练功与战报。</p>
+                    <div class="mmo-main" hidden>
+                        <div class="mmo-bg">
+                            <div class="mmo-bg-gradient"></div>
+                            <canvas id="mmo-particles"></canvas>
+                        </div>
+                        <header class="mmo-topbar">
+                            <div class="mmo-avatar" data-act="open-bag"><span id="mmo-avatar-initial">侠</span></div>
+                            <div class="mmo-top-info">
+                                <span class="mmo-currency" id="mmo-currency-main"></span>
+                            </div>
+                            <button class="mmo-menu-btn ui-btn ui-ghost" data-act="toggle-menu">≡</button>
+                        </header>
+                        <aside class="mmo-menu" aria-hidden="true">
+                            <button data-view="pixel">定制像素画</button>
+                            <button data-view="shop">商店</button>
+                            <button data-view="gacha">卡池</button>
+                            <button data-view="recharge">充值</button>
+                            <button data-view="leaderboard">排行榜</button>
+                        </aside>
+                        <main class="mmo-content app-scroll">
+                            <section class="mmo-view mmo-home" data-view="home">
+                                <div class="mmo-hero">
+                                    <h3>竹影弈 · 云间游</h3>
+                                    <p>在像素竹林中游历，收集灵玉、套装与晶体。此为纯前端模拟 Demo，不接入剧情与记忆。</p>
+                                    <div class="mmo-cta-row">
+                                        <button class="ui-btn ui-primary" data-view-target="shop">前往商店</button>
+                                        <button class="ui-btn ui-ghost" data-view-target="gacha">试试抽卡</button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="mmo-view mmo-shop" data-view="shop" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-shop"></span>
+                                    <span class="mmo-pity" id="mmo-score-shop"></span>
+                                </div>
+                                <div class="mmo-shop-body">
+                                    <div class="mmo-shop-list" id="mmo-shop-list"></div>
+                                    <div class="mmo-shop-detail" id="mmo-shop-detail">
+                                        <div class="mmo-shop-placeholder">请选择套装</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="mmo-view mmo-gacha" data-view="gacha" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-gacha"></span>
+                                    <span class="mmo-pity" id="mmo-pity">距保底：-- 抽</span>
+                                </div>
+                                <div class="mmo-gacha-bg">
+                                    <div class="mmo-gacha-results" id="mmo-gacha-results"></div>
+                                    <div class="mmo-gacha-actions">
+                                        <button class="ui-btn ui-ghost" data-pulls="1">1 抽</button>
+                                        <button class="ui-btn ui-primary" data-pulls="10">10 抽</button>
+                                        <button class="ui-btn ui-ghost" data-pulls="50">50 抽</button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="mmo-view mmo-recharge" data-view="recharge" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-recharge"></span>
+                                    <span class="mmo-wallet-tip">扣款来源：微信钱包</span>
+                                </div>
+                                <div class="mmo-recharge-cards" id="mmo-recharge-cards"></div>
+                            </section>
+
+                            <section class="mmo-view mmo-leader" data-view="leaderboard" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-leader"></span>
+                                    <span class="mmo-pity" id="mmo-score-rank"></span>
+                                </div>
+                                <div class="mmo-leader-list" id="mmo-leader-list"></div>
+                                <div class="mmo-player-rank" id="mmo-player-rank"></div>
+                            </section>
+
+                            <section class="mmo-view mmo-bag" data-view="bag" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-bag"></span>
+                                    <span class="mmo-pity">背包</span>
+                                </div>
+                                <div class="mmo-bag-list" id="mmo-bag-list"></div>
+                            </section>
+
+                            <section class="mmo-view mmo-pixel" data-view="pixel" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-pixel"></span>
+                                    <span class="mmo-pity">像素画定制 · 占位</span>
+                                </div>
+                                <p class="mmo-placeholder">这里将展示像素头像/动态，当前为占位页面。</p>
+                            </section>
+                        </main>
                     </div>
                 </div>
             </div>
-            <div id="red-envelope-overlay" aria-hidden="true">
-                <div class="red-envelope-card">
-                    <div class="red-envelope-title">红包</div>
-                    <div class="red-envelope-amount" id="red-envelope-amount">¥0.00</div>
-                    <div class="red-envelope-note">点击领取即可拆开红包</div>
-                    <button id="red-envelope-confirm">领取</button>
+
+        </div>
+            <div id="red-envelope-overlay" class="ui-modal-backdrop" aria-hidden="true">
+                <div class="red-envelope-card ui-modal">
+                    <header class="ui-modal-header">
+                        <div class="red-envelope-title">红包</div>
+                    </header>
+                    <section class="ui-modal-body">
+                        <div class="red-envelope-amount" id="red-envelope-amount">¥0.00</div>
+                        <div class="red-envelope-note">点击领取即可拆开红包</div>
+                    </section>
+                    <footer class="ui-modal-footer">
+                        <button id="red-envelope-confirm">领取</button>
+                    </footer>
                 </div>
             </div>
-            <div id="in-call-overlay" aria-hidden="true">
-                <div class="in-call-card">
-                    <div class="in-call-name" id="in-call-name">元书</div>
-                    <div class="in-call-status" id="in-call-status">来电中…</div>
-                    <div class="in-call-timer" id="in-call-timer">00:00</div>
-                    <div class="in-call-transcript" id="in-call-transcript"></div>
-                    <button id="in-call-end">挂断</button>
+            <div id="in-call-overlay" class="ui-modal-backdrop" aria-hidden="true">
+                <div class="in-call-card ui-modal">
+                    <header class="ui-modal-header">
+                        <div class="in-call-name" id="in-call-name">元书</div>
+                    </header>
+                    <section class="ui-modal-body">
+                        <div class="in-call-status" id="in-call-status">来电中…</div>
+                        <div class="in-call-timer" id="in-call-timer">00:00</div>
+                        <div class="in-call-transcript" id="in-call-transcript"></div>
+                    </section>
+                    <footer class="ui-modal-footer">
+                        <button id="in-call-end">挂断</button>
+                    </footer>
                 </div>
             </div>
             <div id="home-bar"></div>

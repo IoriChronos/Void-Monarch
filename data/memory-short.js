@@ -11,6 +11,8 @@ function trimBuffer(buffer, limit) {
 
 export function addShortMemory(entry) {
     if (!entry || !entry.text) return;
+    const meta = entry.meta || {};
+    if (meta.placeholder || meta.loading || meta.failed || meta.opening) return;
     storyMemory.push({
         role: entry.role || "system",
         text: entry.text,

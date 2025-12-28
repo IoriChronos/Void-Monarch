@@ -1,0 +1,54 @@
+@import url("../tokens.css");
+
+.ui-input {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-8);
+    width: 100%;
+    min-height: 40px;
+    padding: 0 var(--ui-space-12);
+    border-radius: var(--ui-radius-md);
+    border: none;
+    box-shadow: inset 0 0 0 1px var(--ui-border);
+    background: var(--ui-surface-1);
+    transition: box-shadow 140ms ease, background-color 140ms ease;
+}
+
+.ui-input:hover {
+    box-shadow: inset 0 0 0 1px var(--ui-border-strong);
+}
+
+.ui-input:focus-within {
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--ui-accent) 60%, transparent),
+        0 0 0 2px color-mix(in srgb, var(--ui-accent) 30%, transparent);
+}
+
+.ui-input-field {
+    border: none !important;
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--ui-text-strong);
+    font: 400 14px/1.6 var(--ui-font-base);
+    width: 100%;
+    padding: var(--ui-space-10) 0;
+}
+
+.ui-input-field::placeholder {
+    color: var(--ui-text-muted);
+}
+
+.ui-input-field:disabled {
+    opacity: 0.6;
+}
+
+.ui-input > .ui-input-field {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.ui-input textarea.ui-input-field {
+    resize: vertical;
+}

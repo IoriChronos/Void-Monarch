@@ -102,20 +102,52 @@ export function renderStoryBubble(entry, options = {}) {
     const node = document.createElement("div");
 
     if (renderAsBubble) {
+        node.classList.add("ui-bubble", "story-bubble");
         applyBubbleClasses(node, entry, meta);
         if (entry.meta?.systemInput) {
             node.classList.add("bubble-system-input");
+            if (entry.meta?.userIntent) {
+                node.classList.add("bubble-prompt");
+            }
         }
         if (entry.meta?.opening) {
             node.classList.add("bubble-opening");
         }
         const content = document.createElement("div");
-        content.className = "bubble-content";
-        content.innerHTML = buildParagraphHtml(meta);
+        content.className = "bubble-content ui-bubble-content";
+        if (entry.meta?.callTranscript) {
+            const fold = document.createElement("div");
+            fold.className = "bubble-fold";
+            fold.innerHTML = `
+                <div class="fold-head">
+                    <span class="fold-title">${escapeHtml(entry.meta.callFoldTitle || "通话记录")}</span>
+                    <button class="fold-toggle" type="button">展开</button>
+                </div>
+                <div class="fold-body">${buildParagraphHtml({ ...meta, paragraphs: entry.meta.callTranscript.split("\\n") })}</div>
+            `;
+            const btn = fold.querySelector(".fold-toggle");
+            const body = fold.querySelector(".fold-body");
+            const toggle = () => {
+                const open = fold.classList.toggle("open");
+                if (btn) btn.textContent = open ? "收起" : "展开";
+                if (body) body.style.maxHeight = open ? `${body.scrollHeight}px` : "0px";
+            };
+            if (body) body.style.maxHeight = "0px";
+            btn?.addEventListener("click", toggle);
+            fold.addEventListener("click", (e) => {
+                if (e.target === btn) return;
+                toggle();
+            });
+            content.appendChild(fold);
+        }
+        const mainText = document.createElement("div");
+        mainText.className = "bubble-main-text";
+        mainText.innerHTML = buildParagraphHtml(meta);
+        content.appendChild(mainText);
         if (entry.meta?.systemInput) {
             const chip = document.createElement("span");
             chip.className = "bubble-system-chip";
-            chip.textContent = "SYSTEM";
+            chip.textContent = entry.meta?.userIntent ? "PROMPT" : "SYSTEM";
             node.appendChild(chip);
         }
         node.appendChild(content);
@@ -214,6 +246,14 @@ function parseMeta(entry) {
 
 function applyBubbleClasses(bubble, entry, meta) {
     bubble.classList.add("story-bubble");
+    const actorClass = entry.role === "user"
+        ? "ui-bubble-user"
+        : (meta.type === "system" || entry.role === "system") ? "ui-bubble-system" : "ui-bubble-ai";
+    bubble.classList.add(actorClass);
+    if (entry.meta?.systemInput) {
+        bubble.classList.add("bubble-system-input", "bubble-user", "ui-bubble-system-input");
+        return;
+    }
     if (meta.type === "system") {
         bubble.classList.add("bubble-system");
         return;
@@ -239,6 +279,9 @@ function applyBubbleClasses(bubble, entry, meta) {
         if (len < 25) bubble.classList.add("dialog-short");
         else if (len > 120) bubble.classList.add("dialog-long");
         else bubble.classList.add("dialog-medium");
+    }
+    if (meta.type === "narration" && (meta.textLength || 0) > 200) {
+        bubble.classList.add("bubble-long-narration");
     }
 }
 
@@ -469,7 +512,7 @@ const SPACING_MATRIX = {
     }
 };
 
-const THOUGHT_MARGIN = 10;
+const THOUGHT_MARGIN = 14;
 
 function baseSpacing(prevType, currentType) {
     const normalizedPrev = normalizeSpacingType(prevType);

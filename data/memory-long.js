@@ -1,17 +1,29 @@
+import { getWindowId, windowScopedKey } from "../core/window-context.js";
+
 const MAX_EPISODES = 200;
 const SUMMARY_CHUNK_SIZE = 20;
-const CONTEXT_LIMIT_KEY = "yuan-phone:long-memory-limit";
 const DEFAULT_CONTEXT_LIMIT = 3;
 
 let episodes = [];
 let pendingEvents = [];
-let contextLimit = loadContextLimit();
+let contextKeyCache = null;
+let contextLimit = DEFAULT_CONTEXT_LIMIT;
+
+function contextLimitKey() {
+    if (contextKeyCache) return contextKeyCache;
+    try {
+        contextKeyCache = windowScopedKey("yuan-phone:long-memory-limit", getWindowId());
+    } catch {
+        contextKeyCache = "yuan-phone:long-memory-limit";
+    }
+    return contextKeyCache;
+}
 
 function loadContextLimit() {
     if (typeof window === "undefined" || !window.localStorage) {
         return DEFAULT_CONTEXT_LIMIT;
     }
-    const raw = window.localStorage.getItem(CONTEXT_LIMIT_KEY);
+    const raw = window.localStorage.getItem(contextLimitKey());
     const value = Number(raw);
     if (Number.isFinite(value) && value > 0) return value;
     return DEFAULT_CONTEXT_LIMIT;
@@ -20,7 +32,7 @@ function loadContextLimit() {
 function persistContextLimit() {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
-        window.localStorage.setItem(CONTEXT_LIMIT_KEY, String(contextLimit));
+        window.localStorage.setItem(contextLimitKey(), String(contextLimit));
     } catch (err) {
         console.warn("Failed to persist long memory limit", err);
     }

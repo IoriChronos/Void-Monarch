@@ -1,5 +1,9 @@
-import { addShortMemory, addShortEventMemory, hydrateShortMemory } from "./memory-short.js";
-import { getActiveCard, DEFAULT_OPENER, GENERIC_OPENER } from "./character-cards.js";
+import { addShortEventMemory, hydrateShortMemory } from "./memory-short.js";
+import { getActiveCard, getCardForWindow } from "./character-cards.js";
+import { appendPendingPhoneEvent } from "./window-memory.js";
+import { getWindowId } from "../core/window-context.js";
+import { setWindowUserPersonaOverride, getWindowUserPersonaOverride } from "./window-memory.js";
+import { getGlobalUserPersona, getGlobalUserName } from "./system-rules.js";
 
 const SYSTEM_VERSION = 2;
 const MARKER_TO_TYPE = {
@@ -64,9 +68,45 @@ const initialChats = () => ([
 ]);
 
 const initialMoments = () => ([
-    { id: "m1", who: "你", authorId: "player", text: "今天只是想确认一件事：你有没有在看我。", time: "刚刚", likes: 23, likedByUser: false, comments: [] },
-    { id: "m2", who: "未知信号", authorId: "shadow", text: "今晚的城很安静，像在等一场失控。", time: "1 小时前", likes: 9, likedByUser: false, comments: [] },
-    { id: "m3", who: "甜品店老板", authorId: "sys", text: "提前留了三盒奶油泡芙，希望他别发火。", time: "2 小时前", likes: 12, likedByUser: false, comments: [] }
+    {
+        id: "m1",
+        who: "你",
+        authorId: "player",
+        text: "今天只是想确认一件事：你有没有在看我。",
+        time: "刚刚",
+        createdAt: Date.now(),
+        visibilityDays: 7,
+        deleted: false,
+        likes: 23,
+        likedByUser: false,
+        comments: []
+    },
+    {
+        id: "m2",
+        who: "未知信号",
+        authorId: "shadow",
+        text: "今晚的城很安静，像在等一场失控。",
+        time: "1 小时前",
+        createdAt: Date.now() - (2 * 60 * 60 * 1000),
+        visibilityDays: 7,
+        deleted: false,
+        likes: 9,
+        likedByUser: false,
+        comments: []
+    },
+    {
+        id: "m3",
+        who: "甜品店老板",
+        authorId: "sys",
+        text: "提前留了三盒奶油泡芙，希望他别发火。",
+        time: "2 小时前",
+        createdAt: Date.now() - (3 * 60 * 60 * 1000),
+        visibilityDays: 7,
+        deleted: false,
+        likes: 12,
+        likedByUser: false,
+        comments: []
+    }
 ]);
 
 const initialCallHistory = () => ([
@@ -75,11 +115,10 @@ const initialCallHistory = () => ([
     { name: "未知号码", time: "前天", note: "未接" }
 ]);
 
-const GENERIC_OPENER_FALLBACK = GENERIC_OPENER || "这是默认开场白";
-const DEFAULT_OPENER_FALLBACK = DEFAULT_OPENER || GENERIC_OPENER_FALLBACK;
+let initBackup = null;
 
-function seedDefaultStory(card = getActiveCard()) {
-    const opener = (card?.opener && String(card.opener).trim()) || (card?.id === "default" ? DEFAULT_OPENER_FALLBACK : GENERIC_OPENER_FALLBACK);
+function seedDefaultStory(card = getCardForWindow() || getActiveCard()) {
+    const opener = (card?.opener && String(card.opener).trim()) || "";
     const segments = segmentStoryPayload(opener);
     if (!segments.length) return [];
     const total = segments.length;
@@ -95,26 +134,45 @@ function createId(prefix = "id") {
     return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function createDefaultState(card = getActiveCard()) {
+function createDefaultState(card = getCardForWindow() || getActiveCard()) {
     const skipSeed = typeof window !== "undefined" && window.__SHELL_HOSTED__;
     const baseStory = skipSeed ? [] : seedDefaultStory(card);
-    return {
-        systemVersion: SYSTEM_VERSION,
-        story: baseStory.map(entry => ({ ...entry, id: entry.id || createId("story") })),
+    const allowYuanShu = (getGlobalUserName() || "").trim() === "沈安亦";
+    const emptyPhone = {
+        contacts: [],
+        chats: [],
+        chatOrder: [],
+        moments: [],
+        callHistory: [],
+        unread: { total: 0, byApp: { wechat: 0, phone: 0 } },
+        wallet: { balance: 0, events: [] }
+    };
+    const seededPhone = allowYuanShu ? {
         contacts: initialContacts.map(c => ({ ...c })),
         chats: initialChats().map((chat, idx) => enrichChat(chat, idx)),
         chatOrder: ["yuan", "room", "shadow", "sys"],
         moments: initialMoments().map(moment => enrichMoment(moment, initialContacts)),
         callHistory: initialCallHistory().map(entry => ({ ...entry })),
-        memoEntries: [],
-        eventsLog: [],
         unread: { total: 1, byApp: { wechat: 1, phone: 0 } },
         wallet: {
-            balance: 2180.0,
+            balance: 1314.0,
             events: [
-                { type: "income", source: "元书", amount: 1314.0, time: Date.now() - 3600 * 1000 }
+                { type: "income", source: "元书转账", amount: 1314.0, time: Date.now() - 3600 * 1000 }
             ]
-        },
+        }
+    } : emptyPhone;
+    return {
+        systemVersion: SYSTEM_VERSION,
+        story: baseStory.map(entry => ({ ...entry, id: entry.id || createId("story") })),
+        contacts: seededPhone.contacts,
+        chats: seededPhone.chats,
+        chatOrder: seededPhone.chatOrder,
+        moments: seededPhone.moments,
+        callHistory: seededPhone.callHistory,
+        memoEntries: [],
+        eventsLog: [],
+        unread: seededPhone.unread,
+        wallet: seededPhone.wallet,
         blackFog: { nodes: [], lastTrigger: null },
         triggers: [],
         lastAppOpened: null,
@@ -138,12 +196,133 @@ function enrichChat(chat, index = 0) {
     };
 }
 
+export function applyInitializerState(payload = {}, windowId = null) {
+    if (!payload || (typeof payload !== "object" && typeof payload !== "string")) return false;
+    if (!initBackup) {
+        initBackup = cloneState(worldState);
+    }
+    const scoped = windowId || getWindowId();
+    const userName = getGlobalUserName();
+    const allowYuanShu = userName === "沈安亦";
+    updateWorldState((state) => {
+        if (typeof payload === "string") {
+            state.contacts = [];
+            state.chats = [];
+            state.chatOrder = [];
+            state.moments = [];
+            state.callHistory = [];
+            state.wallet = { balance: 0, events: [] };
+            return;
+        }
+        const contacts = Array.isArray(payload.contacts) ? payload.contacts : [];
+        const chats = [];
+        const chatOrder = [];
+        const now = Date.now();
+        contacts.forEach((item, idx) => {
+            if (!item || !item.name) return;
+            if (!allowYuanShu && /元书/.test(item.name)) return;
+            const id = item.id || `contact-${idx}`;
+            chatOrder.push(id);
+            const log = Array.isArray(item.chatSeed)
+                ? item.chatSeed
+                    .filter(entry => entry && entry.text)
+                    .map(entry => ({
+                        from: entry.from === "user" ? "out" : "in",
+                        text: entry.text,
+                        time: entry.time || "刚刚"
+                    }))
+                : [];
+            chats.push({
+                id,
+                name: item.name,
+                icon: item.icon || "◻",
+                time: "刚刚",
+                unread: 0,
+                pinned: Boolean(item.pinned),
+                blocked: false,
+                preview: item.lastMessagePreview || computeChatPreview(log),
+                orderIndex: idx,
+                log
+            });
+        });
+        if (chats.length) {
+            state.contacts = chats.map(c => ({ id: c.id, name: c.name, icon: c.icon }));
+            state.chats = chats;
+            state.chatOrder = chatOrder;
+        }
+        const moments = Array.isArray(payload.moments) ? payload.moments : [];
+        if (moments.length) {
+            state.moments = moments.slice(0, 3).map((m, idx) => ({
+                id: m.id || `moment-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+                who: m.author || "访客",
+                authorId: m.author || "npc",
+                text: m.content || "",
+                likes: Array.isArray(m.likes) ? m.likes.length : 0,
+                likedByUser: Array.isArray(m.likes) ? m.likes.includes("user") : false,
+                comments: Array.isArray(m.comments) ? m.comments.map(c => ({ ...c })) : [],
+                visibilityDays: m.visibilityDays || 7,
+                time: "刚刚",
+                createdAt: now - idx * 3600 * 1000,
+                deleted: false,
+                windowId: scoped
+            }));
+        }
+        if (payload.wallet) {
+            const w = payload.wallet;
+            state.wallet = {
+                balance: Number(w.balance) || state.wallet.balance || 0,
+                events: w.lastRecord ? [
+                    {
+                        type: w.lastRecord.type || "income",
+                        source: w.lastRecord.note || "记录",
+                        amount: Number(w.lastRecord.amount) || 0,
+                        time: now
+                    }
+                ] : state.wallet.events || []
+            };
+        }
+    }, "world:init");
+
+    if (typeof payload === "string") {
+        const text = payload.trim();
+        if (text) {
+            const prev = getWindowUserPersonaOverride(windowId, getGlobalUserPersona() || "");
+            const merged = [prev, text].filter(Boolean).join("\n");
+            setWindowUserPersonaOverride(merged, windowId);
+        }
+    } else if (payload.windowUserPersonaPatch && typeof payload.windowUserPersonaPatch === "object") {
+        const prev = getWindowUserPersonaOverride(windowId, getGlobalUserPersona() || "");
+        const patchLines = Object.entries(payload.windowUserPersonaPatch)
+            .filter(([, v]) => typeof v === "string" && v.trim())
+            .map(([k, v]) => `${k}：${v.trim()}`);
+        if (patchLines.length) {
+            const merged = [prev, patchLines.join("\n")].filter(Boolean).join("\n");
+            setWindowUserPersonaOverride(merged, windowId);
+        }
+    }
+    return true;
+}
+
+export function revertInitializerState(windowId = null) {
+    if (!initBackup) return false;
+    const snapshot = initBackup;
+    initBackup = null;
+    initializeWorldState(cloneState(snapshot));
+    return true;
+}
+
 function enrichMoment(moment, contactsSource = initialContacts) {
+    const resolvedWindowId = resolveMomentWindowId(moment);
+    const createdAt = normalizeTimestamp(moment.createdAt || moment.time);
     return {
         id: moment.id || `moment-${Math.random().toString(36).slice(2, 7)}`,
         who: moment.who,
         text: moment.text,
         time: moment.time || "刚刚",
+        createdAt,
+        visibilityDays: normalizeVisibilityDays(moment.visibilityDays),
+        deleted: Boolean(moment.deleted),
+        windowId: resolvedWindowId,
         likes: moment.likes || 0,
         likedByUser: Boolean(moment.likedByUser),
         authorId: moment.authorId || deriveAuthorId(moment.who, contactsSource),
@@ -175,6 +354,32 @@ function computeChatPreview(log = []) {
 
 function unreadOfChats(chats) {
     return chats.reduce((sum, chat) => sum + (chat.unread || 0), 0);
+}
+
+function normalizeVisibilityDays(value) {
+    if (value === "self") return "self";
+    const num = Number(value);
+    if (num === 1 || num === 3 || num === 7) return num;
+    return 7;
+}
+
+function normalizeTimestamp(value) {
+    const num = Number(value);
+    if (Number.isFinite(num) && num > 0) return num;
+    if (typeof value === "string") {
+        const parsed = Date.parse(value);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return Date.now();
+}
+
+function resolveMomentWindowId(moment) {
+    if (moment?.windowId) return moment.windowId;
+    try {
+        return getWindowId();
+    } catch {
+        return null;
+    }
 }
 
 let worldState = createDefaultState();
@@ -254,6 +459,10 @@ export function updateWorldState(mutator, path = "world:update") {
     emit(path, { type: path });
 }
 
+function cloneState(state) {
+    return JSON.parse(JSON.stringify(state));
+}
+
 export function addStoryMessage(role, text, meta = {}) {
     const segments = segmentStoryPayload(text);
     if (!segments.length) return [];
@@ -262,7 +471,6 @@ export function addStoryMessage(role, text, meta = {}) {
     segments.forEach((segment, index) => {
         const entry = createStoryEntry(role, segment.text, meta, segment.storyType, index, total);
         worldState.story.push(entry);
-        addShortMemory(entry);
         entries.push(entry);
         emit("story:append", { message: entry });
     });
@@ -279,7 +487,7 @@ export function trimStoryAfter(messageId) {
     return true;
 }
 
-export function editStoryMessage(messageId, text) {
+export function editStoryMessage(messageId, text, metaPatch = null) {
     if (!messageId || typeof text !== "string") return false;
     const clean = text.trim();
     if (!clean) return false;
@@ -287,7 +495,21 @@ export function editStoryMessage(messageId, text) {
     if (!entry) return false;
     entry.text = clean;
     entry.time = Date.now();
+    if (metaPatch && typeof metaPatch === "object") {
+        const existing = entry.meta && typeof entry.meta === "object" ? entry.meta : {};
+        entry.meta = { ...existing, ...metaPatch };
+    }
     hydrateShortMemory(worldState.story);
+    emit("story:update", { message: { ...entry } });
+    return true;
+}
+
+export function attachSnapshot(messageId, snapshotId) {
+    if (!messageId || !snapshotId) return false;
+    const entry = worldState.story.find(item => item.id === messageId);
+    if (!entry || entry.role !== "system") return false;
+    if (entry.meta?.placeholder || entry.meta?.error) return false;
+    entry.snapshotId = snapshotId;
     emit("story:update", { message: { ...entry } });
     return true;
 }
@@ -359,7 +581,9 @@ function looksLikeDialogue(text = "") {
 }
 
 function createStoryEntry(role, text, meta = {}, storyType = null, index = 0, total = 1) {
-    const metaData = { ...(meta.meta || {}) };
+    const baseMeta = meta && typeof meta === "object" ? { ...meta } : {};
+    const metaData = { ...(meta.meta || {}), ...baseMeta };
+    delete metaData.meta;
     if (storyType) metaData.storyType = storyType;
     metaData.segmentIndex = index;
     metaData.segmentTotal = total;
@@ -396,6 +620,11 @@ export function addChatMessage(chatId, message = {}) {
         app: "wechat",
         text: entry.text || chat.preview || "",
         meta: { chatId, direction: entry.from }
+    });
+    appendPendingForWindow({
+        text: entry.text || chat.preview || "",
+        type: "wechat",
+        time: entry.time
     });
     if (entry.from === "in") {
         chat.unread = (chat.unread || 0) + 1;
@@ -464,22 +693,22 @@ export function withdrawChatMessage(chatId, msgIndex = null) {
 }
 
 export function deleteMoment(momentId) {
-    const index = worldState.moments.findIndex(m => m.id === momentId);
-    if (index === -1) return null;
-    const [removed] = worldState.moments.splice(index, 1);
-    emit("moments:delete", { momentId, moment: removed });
+    const moment = getMomentById(momentId);
+    if (!moment || moment.deleted) return null;
+    moment.deleted = true;
+    emit("moments:delete", { momentId, moment });
     addShortEventMemory({
         type: "moments-delete",
         app: "moments",
-        text: removed?.text || "删除了朋友圈",
+        text: moment?.text || "删除了朋友圈",
         meta: { momentId }
     });
-    return removed;
+    return moment;
 }
 
 export function addMomentComment(momentId, comment) {
     const moment = getMomentById(momentId);
-    if (!moment) return;
+    if (!moment || moment.deleted) return;
     const entry = {
         from: comment.from || "你",
         text: comment.text || "",
@@ -495,6 +724,11 @@ export function addMomentComment(momentId, comment) {
         app: "moments",
         text: `${entry.from || "访客"}: ${entry.text}`,
         meta: { momentId }
+    });
+    appendPendingForWindow({
+        text: `${entry.from || "访客"}: ${entry.text}`,
+        type: "moments",
+        time: entry.time
     });
     emit("moments:comment", { momentId, comment: entry });
 }
@@ -515,7 +749,7 @@ export function commentMoment(momentId, authorId = "player", text, mentions = []
 
 export function likeMoment(momentId, userId = "player", liked = true) {
     const moment = getMomentById(momentId);
-    if (!moment) return null;
+    if (!moment || moment.deleted) return null;
     const current = userId === "player" ? Boolean(moment.likedByUser) : false;
     const shouldLike = typeof liked === "boolean" ? liked : !current;
     const delta = shouldLike ? 1 : -1;
@@ -533,10 +767,23 @@ export function likeMoment(momentId, userId = "player", liked = true) {
     return moment;
 }
 
+export function setMomentVisibility(momentId, visibilityDays) {
+    const moment = getMomentById(momentId);
+    if (!moment || moment.deleted) return null;
+    const next = normalizeVisibilityDays(visibilityDays);
+    moment.visibilityDays = next;
+    moment.windowId = moment.windowId || resolveMomentWindowId(moment);
+    emit("moments:visibility", { momentId, visibilityDays: next });
+    return moment;
+}
+
 export function addMomentPost(post) {
     const entry = enrichMoment({
         ...post,
-        id: post.id || `moment-${Date.now()}`
+        id: post.id || `moment-${Date.now()}`,
+        createdAt: post.createdAt || Date.now(),
+        visibilityDays: post.visibilityDays,
+        deleted: false
     }, worldState.contacts);
     worldState.moments.unshift(entry);
     addShortEventMemory({
@@ -545,11 +792,16 @@ export function addMomentPost(post) {
         text: `New moment posted: "${entry.text}"`,
         meta: { momentId: entry.id, authorId: entry.authorId }
     });
+    appendPendingForWindow({
+        text: entry.text || "",
+        type: "moment_post",
+        time: entry.time || Date.now()
+    });
     emit("moments:post", { post: entry });
     return entry;
 }
 
-export function postMoment(text, images = [], authorId = "player") {
+export function postMoment(text, images = [], authorId = "player", visibilityDays = 7) {
     if (!text) return null;
     const who = authorId === "player"
         ? "你"
@@ -559,7 +811,8 @@ export function postMoment(text, images = [], authorId = "player") {
         authorId,
         text,
         images,
-        time: "刚刚"
+        time: "刚刚",
+        visibilityDays
     });
 }
 
@@ -599,6 +852,11 @@ export function addCallLog(entryOrType) {
         app: "phone",
         text: `${record.name} · ${record.note || "通话"}`,
         meta: { direction: payload.direction || record.note }
+    });
+    appendPendingForWindow({
+        text: `${record.name} · ${record.note || "通话"}`,
+        type: "call",
+        time: record.time
     });
     emit("calls:add", { record });
     return 0;
@@ -669,7 +927,8 @@ export function adjustWalletBalance(delta, meta = {}) {
 
 export function sendTransfer(amount, reason = "转账") {
     const delta = Number(amount) || 0;
-    adjustWalletBalance(delta, { source: reason });
+    const source = reason || "转账";
+    adjustWalletBalance(delta, { source });
     return worldState.wallet.balance;
 }
 
@@ -736,4 +995,12 @@ function refreshUnread() {
     const totalWechat = unreadOfChats(worldState.chats);
     worldState.unread.byApp.wechat = totalWechat;
     worldState.unread.total = totalWechat + (worldState.unread.byApp.phone || 0);
+}
+
+function appendPendingForWindow(entry) {
+    try {
+        appendPendingPhoneEvent(entry, getWindowId());
+    } catch {
+        appendPendingPhoneEvent(entry);
+    }
 }

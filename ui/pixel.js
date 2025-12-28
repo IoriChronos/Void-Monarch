@@ -7,7 +7,8 @@ const CLOUD_HEIGHT = 36;
 const ICON_DRAWERS = {
     eye: drawEyeIcon,
     pulse: drawPulseIcon,
-    envelope: drawEnvelopeIcon
+    envelope: drawEnvelopeIcon,
+    jade: drawJadeCoin
 };
 
 const CLOUD_VARIANTS = [
@@ -113,6 +114,22 @@ function drawEnvelopeIcon(ctx) {
     ctx.lineTo(18, 8);
     ctx.closePath();
     ctx.fill();
+}
+
+function drawJadeCoin(ctx) {
+    ctx.fillStyle = "#05100b";
+    ctx.fillRect(0, 0, ICON_SIZE, ICON_SIZE);
+    ctx.fillStyle = "#6ef2c1";
+    ctx.fillRect(4, 4, 14, 14);
+    ctx.fillStyle = "#1a3028";
+    ctx.fillRect(5, 5, 12, 12);
+    ctx.fillStyle = "#5ce3ae";
+    ctx.fillRect(6, 6, 10, 10);
+    ctx.fillStyle = "#0b2018";
+    ctx.fillRect(10, 6, 2, 10);
+    ctx.fillRect(6, 10, 10, 2);
+    ctx.fillStyle = "#b7ffe1";
+    ctx.fillRect(7, 7, 2, 2);
 }
 
 // ===== Cloud pixel art for fog =====

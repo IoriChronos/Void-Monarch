@@ -1,0 +1,52 @@
+@import url("../tokens.css");
+
+:root {
+    --ui-scroll-size: 10px;
+    --ui-scroll-radius: 12px;
+    --ui-scroll-thumb: color-mix(in srgb, var(--ui-accent) 50%, transparent);
+    --ui-scroll-track: color-mix(in srgb, var(--ui-surface-2) 70%, transparent);
+}
+
+.ui-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--ui-scroll-thumb) var(--ui-scroll-track);
+}
+
+.ui-scroll::-webkit-scrollbar {
+    width: var(--ui-scroll-size);
+    height: var(--ui-scroll-size);
+}
+
+.ui-scroll::-webkit-scrollbar-thumb {
+    background: var(--ui-scroll-thumb);
+    border-radius: var(--ui-scroll-radius);
+    border: 1px solid color-mix(in srgb, var(--ui-scroll-thumb) 60%, transparent);
+}
+
+.ui-scroll::-webkit-scrollbar-track {
+    background: var(--ui-scroll-track);
+    border-radius: var(--ui-scroll-radius);
+}
+
+.sheet-body.ui-modal-body.ui-scroll,
+.sheet-body.ui-modal-body.ui-scroll::-webkit-scrollbar {
+    --ui-scroll-size: 8px;
+}
+
+.sheet-body.ui-modal-body.ui-scroll::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--ui-scroll-thumb) 70%, transparent);
+    border-radius: 999px;
+}
+
+.sheet-body.ui-modal-body.ui-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.ui-scroll-hide {
+    scrollbar-width: none;
+}
+
+.ui-scroll-hide::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}

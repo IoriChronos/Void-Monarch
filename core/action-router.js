@@ -1,25 +1,29 @@
 import {
-    addStoryMessage,
     sendMessage,
     commentMoment,
     addCallLog,
     updateCallLog
 } from "../data/world-state.js";
-import { recordLongMemory } from "./ai.js";
 import { triggerIncomingCall } from "../apps/phone.js";
 import { addEventLog } from "../data/events-log.js";
+import { getWindowId } from "./window-context.js";
 
 export function applyAction(action) {
     if (!action || !action.action) return;
+    try {
+        const localWin = typeof getWindowId === "function" ? getWindowId() : null;
+        if (action.windowId && localWin && action.windowId !== localWin) {
+            console.warn("Window mismatch for action, ignored.", { expected: localWin, actionWindow: action.windowId });
+            return;
+        }
+    } catch {
+        /* ignore window id assertion errors */
+    }
     const { payload = {} } = action;
     switch (action.action) {
         case "reply_story":
-            if (payload.text) {
-                addStoryMessage("system", payload.text);
-                recordLongMemory({ text: payload.text });
-                addEventLog({ text: `剧情：${payload.text}`, type: "story" });
-            }
-            break;
+            console.warn("reply_story should be committed via UI pipeline, skipping direct append.");
+            return;
         case "send_wechat":
             sendMessage(payload.chatId || "yuan", payload.text || "", payload.from || "in", {
                 kind: payload.kind,

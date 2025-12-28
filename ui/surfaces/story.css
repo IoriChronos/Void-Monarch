@@ -1,0 +1,116 @@
+@import url("../tokens.css");
+
+.story-bubbles-layer {
+    gap: var(--ui-space-10);
+}
+
+#story-input-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--ui-space-8);
+    padding: var(--ui-space-10) var(--ui-space-12);
+    background: var(--ui-surface-0);
+    border-top: 1px solid var(--ui-border);
+}
+
+#story-input-row .ui-input {
+    flex: 1;
+}
+
+#story-input-row .ui-btn {
+    height: 40px;
+    padding-inline: var(--ui-space-16);
+}
+
+.story-tools .ui-btn {
+    height: 36px;
+}
+
+.restart-sheet .ui-modal,
+.story-edit-sheet .ui-modal {
+    width: min(420px, 92vw);
+}
+
+.story-edit-sheet .ui-modal textarea {
+    width: 100%;
+}
+
+.ui-bubble {
+    margin-bottom: var(--ui-space-8);
+}
+
+.story-bubble {
+    margin-left: 0;
+    margin-right: 0;
+    overflow: visible;
+}
+
+.story-bubble.bubble-narration {
+    margin-inline: 4%;
+}
+
+.story-bubble.bubble-long-narration {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--ui-accent) 6%, var(--ui-surface-1)), var(--ui-surface-1));
+    animation: bubbleGlow 9s ease-in-out infinite;
+    box-shadow: var(--ui-shadow-lift), inset 0 0 0 1px color-mix(in srgb, var(--ui-accent) 10%, transparent);
+    position: relative;
+}
+.story-bubble.bubble-long-narration::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border-radius: inherit;
+    background: radial-gradient(120% 120% at 20% 20%, color-mix(in srgb, var(--ui-accent) 8%, transparent), transparent 60%);
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.story-bubble.bubble-action {
+    margin-inline: 5%;
+    align-self: center;
+    max-width: 90%;
+}
+
+.story-bubble.bubble-dialog,
+.story-bubble.bubble-assistant {
+    margin-right: 15%;
+    padding-left: 2%;
+}
+
+.story-bubble.bubble-thought {
+    margin-inline: 5%;
+    margin-top: var(--ui-space-12);
+    margin-bottom: var(--ui-space-12);
+}
+
+.story-bubble.bubble-system {
+    margin-inline: 10%;
+    padding-inline: var(--ui-space-10);
+}
+
+.story-bubble.bubble-dialog-linked {
+    position: relative;
+}
+
+.story-bubble.bubble-dialog-linked::before {
+    content: "";
+    position: absolute;
+    left: 12px;
+    top: -6px;
+    width: 42px;
+    height: 12px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ui-accent) 20%, transparent);
+    filter: blur(6px);
+    opacity: 0.7;
+}
+
+.story-bubble.bubble-dialog-has-next {
+    box-shadow: var(--ui-shadow-lift), inset 0 -1px 0 color-mix(in srgb, var(--ui-accent) 14%, transparent);
+}
+
+@keyframes bubbleGlow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}

@@ -1,0 +1,62 @@
+@import url("../tokens.css");
+
+.ui-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: var(--ui-backdrop);
+    backdrop-filter: blur(var(--ui-backdrop-blur));
+    display: grid;
+    place-items: center;
+    z-index: var(--ui-z-modal);
+    padding: var(--ui-space-16);
+}
+
+.ui-modal {
+    width: var(--ui-modal-width);
+    max-height: min(86vh, 640px);
+    background: var(--ui-surface-1);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-lg);
+    box-shadow: var(--ui-shadow-soft);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.ui-modal-header,
+.ui-modal-footer {
+    padding: var(--ui-space-12) var(--ui-space-16);
+    border-bottom: 1px solid var(--ui-border);
+    flex-shrink: 0;
+}
+
+.ui-modal-footer {
+    border-top: 1px solid var(--ui-border);
+    border-bottom: none;
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-10);
+    justify-content: flex-end;
+}
+
+.ui-modal-body {
+    padding: var(--ui-space-12) var(--ui-space-16) var(--ui-space-16);
+    overflow-y: auto;
+    overflow-x: hidden;
+    color: var(--ui-text-strong);
+    line-height: 1.6;
+    scrollbar-width: thin;
+}
+
+.ui-modal-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.ui-modal-body::-webkit-scrollbar-thumb {
+    background: var(--ui-border-strong);
+    border-radius: 999px;
+}
+
+.ui-modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
