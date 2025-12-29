@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Yuan">
+    <meta name="theme-color" content="#0d080f">
+    <meta name="format-detection" content="telephone=no">
+    <title>Yuan · Story Panel</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon-180.png">
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
+    <link rel="stylesheet" href="../src/styles/legacy-style.css">
+    <script src="../src/utils/orientation-lock.js" defer></script>
+    <style>
+        @media (prefers-reduced-motion: reduce) {
+            * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+        }
+    </style>
+</head>
+<body>
+<script>
+    (function () {
+        const params = new URLSearchParams(location.search);
+        const hash = location.hash ? location.hash.replace(/^#/, "") : "";
+        const slot = params.get("slot") || hash || "story";
+        const role = params.get("role") || "";
+        window.__YUAN_SLOT__ = slot;
+        window.__SHELL_HOSTED__ = true;
+        if (role) window.__YUAN_ROLE_NAME__ = role;
+    })();
+</script>
+<div id="app">
+    <section id="story-panel">
+        <div id="story-fx-base" class="story-fx-layer"></div>
+        <div id="story-fx-upper" class="story-fx-layer"></div>
+
+        <div id="story-bubbles-layer" class="story-bubbles-layer">
+            <header id="story-header">
+                <div id="story-title-text" class="story-title"></div>
+                <div class="story-subtitle">轨迹 • He Loves You. The World Fears Him.</div>
+                <span id="role-restore-hint" class="story-restore-hint" aria-live="polite"></span>
+            </header>
+            <div id="character-sheet" class="character-sheet" aria-hidden="true">
+                <div class="sheet-inner">
+                    <button id="character-sheet-close" type="button">收合</button>
+                    <h3>角色档案</h3>
+                    <p>身影固定在城市的霓虹下，习惯以低沉的宣告和缓慢的呼吸控制一切。如同黑雾的代理人，记得每一次心跳、每一条规则。</p>
+                    <p>喜好：靠近、降温、热牛奶、泡芙。<br>禁忌：被忽视、未经允许的逃离。</p>
+                    <p>提示：若他说“别浪费时间”，代表剧情正在推进到更危险的阶段。</p>
+                </div>
+            </div>
+            <main id="story-log"></main>
+        </div>
+        <footer id="story-input-row">
+            <button id="input-collapse-btn" class="hidden">⌄</button>
+            <textarea id="story-input" rows="2" placeholder="开始你的故事"></textarea>
+            <div class="story-tools">
+                <button id="story-tools-btn" class="story-tools-toggle" aria-label="更多工具">
+                    <span class="tool-bar top"></span>
+                    <span class="tool-bar middle"></span>
+                    <span class="tool-bar bottom"></span>
+                </button>
+                <div id="story-tools-menu" class="story-tools-menu" aria-hidden="true">
+                    <div class="menu-group menu-primary">
+                        <div class="menu-head">常用操作</div>
+                        <div class="menu-row">
+                            <button id="story-tool-system">
+                                <span class="icon-system"></span>
+                                <span>System Prompt</span>
+                            </button>
+                        </div>
+                        <div class="menu-row">
+                            <div class="provider-control">
+                                <span>Narrator Model</span>
+                                <select id="narrator-model-select"></select>
+                            </div>
+                        </div>
+                        <div class="menu-row">
+                            <label class="text-size-control">
+                                <span class="text-size-label">Text Size</span>
+                                <input id="story-font-slider" type="range" min="12" max="18" value="13">
+                                <span id="story-font-value">13px</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="menu-divider" aria-hidden="true"></div>
+                    <div class="menu-group menu-secondary">
+                        <div class="menu-head">重启</div>
+                        <div class="menu-row">
+                            <button id="story-tool-restart">
+                                <span class="icon-restart"></span>
+                                <span>Restart</span>
+                            </button>
+                        </div>
+                        <div class="menu-hint">Story / Phone / All</div>
+                    </div>
+                    <div class="menu-divider" aria-hidden="true"></div>
+                    <div class="menu-group menu-tertiary">
+                        <div class="menu-head">高级联动</div>
+                        <div class="menu-row">
+                            <button id="story-tool-new-window">
+                                <span class="icon-window"></span>
+                                <span>新建窗口</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button id="story-send" class="click-anim" >发送</button>
+        </footer>
+        <div id="restart-sheet" class="restart-sheet ui-modal-backdrop" aria-hidden="true">
+            <div class="sheet-content ui-modal">
+                <header class="ui-modal-header">
+                    <p>重启范围</p>
+                </header>
+                <section class="ui-modal-body">
+                    <button data-restart="story">重置剧情记忆</button>
+                    <button data-restart="phone">重置手机数据</button>
+                    <button data-restart="all">重置全部</button>
+                </section>
+                <footer class="ui-modal-footer">
+                    <button data-restart="cancel" class="ghost">取消</button>
+                </footer>
+            </div>
+        </div>
+        <div id="story-edit-sheet" class="story-edit-sheet ui-modal-backdrop" aria-hidden="true">
+            <div class="edit-panel ui-modal">
+                <header class="ui-modal-header">
+                    <p>编辑上一条输入</p>
+                </header>
+                <section class="ui-modal-body">
+                    <textarea id="story-edit-input" rows="4" placeholder="在这里修改上一条发言…"></textarea>
+                </section>
+                <footer class="edit-actions ui-modal-footer">
+                    <button id="story-edit-save" type="button">保存修改</button>
+                    <button id="story-edit-cancel" type="button" class="ghost">取消</button>
+                </footer>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- 右侧手机区域（PC 上固定，手机上以弹层方式出现） -->
+<aside id="phone-layer">
+    <div id="phone-shell" class="phone-pack">
+
+
+            <div id="status-bar">
+                <div class="sb-left">
+                    <div class="signal"></div>          
+                    <div class="carrier">Yuan</div>
+                    <div id="sb-time">08:18</div>
+                </div>
+                <div class="sb-right">
+                    <div class="battery">
+                        <div class="battery-level" id="bat-level"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="dynamic-island" class="collapsed">
+                <div class="island-content">···</div>
+                <div class="island-call" id="island-call" aria-hidden="true">
+                    <div class="island-call-name" id="island-call-name">未知来电</div>
+                    <div class="island-call-actions">
+                        <button class="pixel-btn decline" data-call-action="decline">✕</button>
+                        <button class="pixel-btn accept" data-call-action="accept">✓</button>
+                    </div>
+                </div>
+                <div class="unlock-ring"></div>
+                <div class="unlock-face">🙂</div>
+                <div class="unlock-check">✅</div>
+            </div>
+            <div id="message-banner" aria-hidden="true">
+                <div class="message-banner-title" id="message-banner-title"></div>
+                <div class="message-banner-text" id="message-banner-text">···</div>
+            </div>
+        <div id="phone">
+
+
+            <!-- 首页：图标 -->
+            <div id="home-screen">
+                <div class="app-icon" data-target="wechat-page">
+                    <div class="icon"></div>
+                    <p>微信</p>
+                </div>
+                <div class="app-icon" data-target="call-page">
+                    <div class="icon"></div>
+                    <p>电话</p>
+                </div>
+                <div class="app-icon" data-target="darkfog-page">
+                    <div class="icon"></div>
+                    <p>黑雾</p>
+                </div>
+                <div class="app-icon" data-target="watch-page">
+                    <div class="icon"></div>
+                    <p>守望</p>
+                </div>
+                <div class="app-icon" data-target="memo-page">
+                    <div class="icon"></div>
+                    <p>备忘录</p>
+                </div>
+                <div class="app-icon" data-target="heart-page">
+                    <div class="icon"></div>
+                    <p>心率</p>
+                </div>
+                <div class="app-icon" data-target="settings-page">
+                    <div class="icon"></div>
+                    <p>设置</p>
+                </div>
+                <div class="app-icon" data-target="shopping-page">
+                    <div class="icon"></div>
+                    <p>购物</p>
+                </div>
+                <div class="app-icon" data-target="mmo-page">
+                    <div class="icon"></div>
+                    <p>武侠</p>
+                </div>
+            </div>
+
+            <!-- 微信页面 -->
+            <div id="wechat-page" class="app-page" style="display:none;">
+                <div class="page-header ui-page-header">
+                    <button class="back-home">‹</button>
+                    <span id="wechat-top">Wechat (3)</span>
+                    <button id="contacts-add-btn" class="contact-add-btn" aria-label="添加好友">＋</button>
+                    <div class="chat-window-head" id="chat-head-controls" style="display:none;">
+                        <button id="chat-back" class="chat-head-btn" aria-label="返回">‹</button>
+                        <div class="chat-head-info">
+                            <span class="chat-title" id="chat-title"></span>
+                            <span class="chat-status" id="chat-status-text"></span>
+                            <span class="chat-unread-total" id="chat-unread-total" style="display:none;"></span>
+                        </div>
+                        <div class="chat-head-actions">
+                            <button id="chat-menu-btn" class="chat-menu-btn chat-head-btn" aria-label="更多选项">⋯</button>
+                            <div id="chat-head-menu" class="chat-head-menu" aria-hidden="true">
+                                <button data-chat-menu="pin">置顶 / 取消</button>
+                                <button data-chat-menu="block">拉黑 / 解除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="app-scroll wechat-body">
+                    <div class="wechat-content">
+                        <div class="wechat-panel" id="wechat-chats"></div>
+
+                        <div class="wechat-panel wechat-moments-wrap" id="wechat-moments" style="display:none;">
+                            <div class="moments-hero">
+                                <div class="moments-notice-slot">
+                                    <div id="moments-notice-rail" class="moments-notice-rail" style="display:none;"></div>
+                                </div>
+                                <div class="moments-cover"></div>
+                                <div class="moments-avatar"></div>
+                            </div>
+                            <div class="moment-composer" id="moment-composer">
+                                <textarea id="moment-composer-input" rows="2" placeholder="发一条朋友圈…"></textarea>
+                                <div class="moment-composer-actions">
+                                    <button id="moment-composer-send">发布</button>
+                                </div>
+                            </div>
+                            <div class="moments-feed-inner" id="wechat-moments-feed"></div>
+                            <div id="moments-notice-panel" class="moments-notice-panel" aria-hidden="true">
+                                <div class="moments-notice-inner">
+                                    <div class="notice-panel-head">
+                                        <span>通知记录</span>
+                                        <button id="moments-notice-close" aria-label="关闭">×</button>
+                                    </div>
+                                    <div class="moments-notice-list" id="moments-notice-list"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="wechat-panel" id="wechat-wallet" style="display:none;">
+                            <div class="wallet-balance">
+                                <div class="label">零钱</div>
+                                <div class="value" id="wallet-balance-amt">¥ 2,180.00</div>
+                                <div class="sub">最近到账：¥1314.00</div>
+                            </div>
+                            <div class="wallet-actions" id="wallet-actions"></div>
+                        </div>
+
+                        <div class="wechat-chat-window" id="wechat-chat-window" style="display:none;">
+                            <div class="chat-window-log" id="wechat-chat-log"></div>
+                            <div class="chat-window-input">
+                                <button id="chat-actions-toggle" aria-label="更多功能">＋</button>
+                                <input id="wechat-chat-input" placeholder="输入消息…" />
+                                <button id="wechat-chat-send">发送</button>
+                            </div>
+                            <div class="chat-actions-panel" id="chat-actions-panel">
+                                <div class="chat-actions-buttons" id="chat-actions-buttons">
+                                    <button data-chataction="pay">转账</button>
+                                    <button data-chataction="red">红包</button>
+                                </div>
+                                <div class="chat-action-form" id="chat-action-form">
+                                    <div class="chat-action-display" id="chat-action-display">¥0.00</div>
+                                    <div class="chat-action-keypad" id="chat-action-keypad"></div>
+                                    <div class="chat-action-form-buttons">
+                                        <button id="chat-action-confirm">确认</button>
+                                        <button id="chat-action-cancel" type="button">取消</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="wechat-tabs wechat-bottom-tabs" id="wechat-bottom">
+                        <button data-wtab="chats" class="active">聊天</button>
+                        <button data-wtab="moments">朋友圈</button>
+                        <button data-wtab="wallet">钱包</button>
+                    </div>
+                </div>
+
+                <div id="chat-context-menu" class="chat-context-menu" aria-hidden="true">
+                    <button data-context-action="recall">撤回消息</button>
+                </div>
+                <div id="add-friend-modal" class="modal" aria-hidden="true">
+                    <div class="modal-content">
+                        <h3>添加好友</h3>
+                        <input id="add-friend-input" type="text" placeholder="输入名称">
+                        <div class="modal-actions">
+                            <button id="add-friend-confirm">发送请求</button>
+                            <button id="add-friend-cancel" class="ghost">取消</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="moment-delete-modal" class="modal" aria-hidden="true">
+                    <div class="modal-content">
+                        <h3>确认删除</h3>
+                        <p>删除后将移除这条动态并同步到记忆中，是否继续？</p>
+                        <div class="modal-actions">
+                            <button id="moment-delete-confirm">确认删除</button>
+                            <button id="moment-delete-cancel" class="ghost">取消</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 电话页面 -->
+            <div id="call-page" class="app-page" style="display:none;">
+                <div class="page-header ui-page-header">
+                    <button class="back-home">‹</button>
+                </div>
+                <div class="page-body app-scroll">
+                    <div class="call-tabs">
+                        <button data-ctab="history" class="active">通话记录</button>
+                        <button data-ctab="contacts">联系人</button>
+                        <button data-ctab="keypad">拨号</button>
+                    </div>
+                    <div class="call-panel" id="call-history"></div>
+                    <div class="call-panel" id="call-contacts" style="display:none;"></div>
+                    <div class="call-panel" id="call-keypad" style="display:none;">
+                        <div class="dial-display" id="dial-display">输入号码…</div>
+                        <div class="dial-grid" id="dial-grid"></div>
+                        <button class="dial-call" id="dial-call">拨打</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 黑雾页面 -->
+            <div id="darkfog-page" class="app-page" style="display:none;">
+                <div class="page-header ui-page-header">
+                    <button class="back-home">‹</button>
+                    <span>黑雾</span>
+                </div>
+                <div class="page-body">
+                    <p>这里以后可以做黑雾调度、压迫感控制面板。</p>
+                </div>
+            </div>
+
+            <!-- 守望页面 -->
+            <div id="watch-page" class="app-page" style="display:none;">
+                <div class="page-header ui-page-header">
+                    <button class="back-home">‹</button>
+                    <span>守望</span>
+                </div>
+                <div class="page-body">
+                    <p>这里以后可以做定位、投影、痕迹记录。</p>
+                </div>
+            </div>
+
+            <!-- 备忘录页面 -->
+            <div id="memo-page" class="app-page" style="display:none;">
+                <div class="page-header ui-page-header">
+                    <button class="back-home">‹</button>
+                    <span>备忘录</span>
+                </div>
+                <div class="app-scroll memo-body">
+                    <div class="memo-controls">
+                        <button id="memo-clear">清空</button>
+                    </div>
+                    <div class="memo-log" id="memo-log"></div>
+                </div>
+            </div>
+
+            <!-- 心率页面 -->
+            <div id="heart-page" class="app-page" style="display:none;">
+                <div class="page-header ui-page-header">
+                    <button class="back-home">‹</button>
+                    <span>心率</span>
+                </div>
+                <div class="page-body">
+                    <p>这里以后接你的心率小游戏。</p>
+                </div>
+            </div>
+
+            <!-- 设置页面 -->
+            <div id="settings-page" class="app-page" style="display:none;">
+                <div class="page-header ui-page-header">
+                    <button class="back-home">‹</button>
+                </div>
+                <div class="page-body app-scroll">
+                    <div class="card-block">壁纸 · 默认</div>
+                    <div class="card-block">AI 模型 · 待接入</div>
+                    <div class="card-block">记忆清单 · 0 条</div>
+                </div>
+            </div>
+            <!-- 购物页面 -->
+            <div id="shopping-page" class="app-page" style="display:none;">
+                <div class="page-header ui-page-header">
+                    <button class="back-home">‹</button>
+                    <span>购物</span>
+                </div>
+                <div class="page-body app-scroll">
+                    <p>购物中心正在准备中……</p>
+                    <p>可以在这里创建采购清单、查看推荐或兑换物资。</p>
+                </div>
+            </div>
+            <!-- 武侠（MMO）页面 -->
+            <div id="mmo-page" class="app-page" style="display:none;">
+                <div class="mmo-shell" data-state="login">
+                    <div class="mmo-login">
+                        <h2 class="mmo-title">燕云·风起</h2>
+                        <p class="mmo-sub">云间飞梭，敛藏刀光与风声。</p>
+                        <button class="ui-btn ui-primary" data-act="mmo-enter">拂衣入局</button>
+                    </div>
+                    <div class="mmo-main" hidden>
+                        <div class="mmo-bg">
+                            <div class="mmo-bg-gradient"></div>
+                            <canvas id="mmo-particles"></canvas>
+                        </div>
+                        <header class="mmo-topbar">
+                            <div class="mmo-avatar" data-act="open-bag"><span id="mmo-avatar-initial">侠</span></div>
+                            <div class="mmo-top-info">
+                                <span class="mmo-currency" id="mmo-currency-main"></span>
+                                <span class="mmo-currency" id="mmo-currency-treasure"></span>
+                            </div>
+                            <button class="mmo-close-btn ui-btn ui-ghost" data-act="mmo-close" hidden>×</button>
+                            <button class="mmo-menu-btn ui-btn ui-ghost" data-act="toggle-menu">≡</button>
+                        </header>
+                        <aside class="mmo-menu" aria-hidden="true">
+                            <button data-view="shop">商店</button>
+                            <button data-view="tshop">天赏</button>
+                            <button data-view="gacha">卡池</button>
+                            <button data-view="recharge">充值</button>
+                            <button data-view="leaderboard">排行榜</button>
+                        </aside>
+                        <main class="mmo-content app-scroll">
+                            <section class="mmo-view mmo-home" data-view="home">
+                                <div class="mmo-hero">
+                                    <h3>风声入夜 · 云影入梦</h3>
+                                    <p>燕云风骨与像素光影并存。此处不接入剧情与记忆，仅作江湖氛围小憩。</p>
+                                    <div class="mmo-cta-row">
+                                        <button class="ui-btn ui-primary" data-view-target="shop">前往商店</button>
+                                        <button class="ui-btn ui-ghost" data-view-target="gacha">试试抽卡</button>
+                                        <button class="ui-btn ui-ghost" data-view-target="leaderboard">看风华榜</button>
+                                    </div>
+                                    <div class="mmo-feature-grid">
+                                        <div class="mmo-feature-card">
+                                            <div class="feature-title">风华榜</div>
+                                            <div class="feature-copy">前五名皆乘朱雀，金光映名。</div>
+                                        </div>
+                                        <div class="mmo-feature-card">
+                                            <div class="feature-title">云间驿</div>
+                                            <div class="feature-copy">灵玉、风华值与套装尽可随时查看。</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="mmo-view mmo-shop" data-view="shop" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-shop"></span>
+                                    <span class="mmo-pity" id="mmo-score-shop"></span>
+                                </div>
+                                <div class="mmo-shop-body">
+                                    <div class="mmo-shop-list" id="mmo-shop-list"></div>
+                                    <div class="mmo-shop-detail" id="mmo-shop-detail">
+                                        <div class="mmo-shop-placeholder">请选择套装</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="mmo-view mmo-tshop" data-view="tshop" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-tshop-balance"></span>
+                                    <span class="mmo-pity" id="mmo-tshop-score"></span>
+                                </div>
+                                <div class="mmo-shop-body">
+                                    <div class="mmo-shop-list" id="mmo-tshop-list"></div>
+                                    <div class="mmo-shop-detail" id="mmo-tshop-detail">
+                                        <div class="mmo-shop-placeholder">请选择天赏兑换物</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="mmo-view mmo-gacha" data-view="gacha" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-gacha"></span>
+                                    <span class="mmo-pity" id="mmo-pity">距保底：-- 抽</span>
+                                </div>
+                                <div class="mmo-gacha-bg">
+                                    <div class="mmo-gacha-results" id="mmo-gacha-results"></div>
+                                    <div class="mmo-gacha-actions">
+                                        <button class="ui-btn ui-ghost" data-pulls="1">1 抽</button>
+                                        <button class="ui-btn ui-primary" data-pulls="10">10 抽</button>
+                                        <button class="ui-btn ui-ghost" data-pulls="50">50 抽</button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="mmo-view mmo-recharge" data-view="recharge" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-recharge"></span>
+                                    <span class="mmo-wallet-tip">扣款来源：微信钱包</span>
+                                </div>
+                                <div class="mmo-recharge-cards" id="mmo-recharge-cards"></div>
+                            </section>
+
+                            <section class="mmo-view mmo-leader" data-view="leaderboard" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-leader"></span>
+                                    <span class="mmo-pity" id="mmo-score-rank"></span>
+                                </div>
+                                <div class="mmo-leader-list" id="mmo-leader-list"></div>
+                                <div class="mmo-player-rank" id="mmo-player-rank"></div>
+                            </section>
+
+                            <section class="mmo-view mmo-bag" data-view="bag" hidden>
+                                <div class="mmo-subhead">
+                                    <span class="mmo-currency" id="mmo-currency-bag"></span>
+                                    <span class="mmo-pity">背包</span>
+                                </div>
+                                <div class="mmo-bag-list" id="mmo-bag-list"></div>
+                            </section>
+
+                        </main>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        <div id="red-envelope-overlay" class="ui-modal-backdrop" aria-hidden="true">
+            <div class="red-envelope-card ui-modal">
+                <header class="ui-modal-header">
+                    <div class="red-envelope-title">红包</div>
+                </header>
+                <section class="ui-modal-body">
+                    <div class="red-envelope-amount" id="red-envelope-amount">¥0.00</div>
+                    <div class="red-envelope-note">点击领取即可拆开红包</div>
+                </section>
+                <footer class="ui-modal-footer">
+                    <button id="red-envelope-confirm">领取</button>
+                </footer>
+            </div>
+        </div>
+        <div id="in-call-overlay" class="ui-modal-backdrop" aria-hidden="true">
+            <div class="in-call-card ui-modal">
+                <header class="ui-modal-header">
+                    <div class="in-call-name" id="in-call-name"></div>
+                </header>
+                <section class="ui-modal-body">
+                    <div class="in-call-status" id="in-call-status">来电中…</div>
+                    <div class="in-call-timer" id="in-call-timer">00:00</div>
+                    <div class="in-call-transcript" id="in-call-transcript"></div>
+                </section>
+                <footer class="ui-modal-footer">
+                    <button id="in-call-end">挂断</button>
+                </footer>
+            </div>
+        </div>
+        <div id="home-bar"></div>
+    </div>
+</aside>
+
+<!-- 悬浮手机按钮 -->
+<button id="phone-toggle" aria-label="打开手机">
+    <div class="pixel-phone">
+        <div class="pixel-screen"></div>
+    </div>
+    <div id="phone-toggle-bubble">新消息</div>
+</button>
+
+<!-- 云朵简笔画预览（仅展示三种形状） -->
+<div id="cloud-demo-layer" aria-hidden="true">
+    <div class="cloud-demo cloud-a">
+        <div class="lump big1"></div>
+        <div class="lump big2"></div>
+        <div class="lump big3"></div>
+        <div class="lump small1"></div>
+        <div class="lump small2"></div>
+        <div class="lump small3"></div>
+    </div>
+    <div class="cloud-demo cloud-b">
+        <div class="lump big1"></div>
+        <div class="lump big2"></div>
+        <div class="lump small1"></div>
+    </div>
+    <div class="cloud-demo cloud-c">
+        <div class="lump big1"></div>
+        <div class="lump small1"></div>
+        <div class="lump small2"></div>
+    </div>
+</div>
+
+<script type="module" src="../src/main.js"></script>
+</body>
+</html>
