@@ -277,7 +277,8 @@ function seedLeaderboardV2() {
 }
 
 function buildShopItems() {
-    const names258 = ["龙吟寒曜", "寒光夜烬", "云海归墟", "青锋暮雪", "墨羽流金", "紫电星痕", "沧浪浮梦", "玄鳞破界", "锦鲤映曜", "孤影长明"];
+    const namesale = ["龙吟寒曜", "寒光夜烬"]
+    const names258 = ["云海归墟", "青锋暮雪", "墨羽流金", "紫电星痕", "沧浪浮梦", "玄鳞破界", "锦鲤映曜", "孤影长明"];
     const names128 = ["竹雾微澜", "霜痕碎影", "夜鹭残星", "星芒引路", "烟雨长歌"];
     const names68 = ["溟光镜界", "魇火幽铃", "缈境斩光", "空城梦阙"];
     const names6 = ["星坠环中"];
@@ -286,6 +287,22 @@ function buildShopItems() {
         { ...HORSE_ITEM, category: "mount" },
         { ...GOOSE_ITEM, category: "mount" }
     ];
+
+    namesale.forEach((name, idx) => {
+        const bonus = Math.floor(Math.random() * 81); // +0~80 风华
+        items.push({
+            id: `set-258-${idx}`,
+            name,
+            price: 1280,
+            score: 500 + bonus,
+            tier: 2580,
+            category: "cloth",
+            isSale: idx < 2,
+            originalPrice: idx < 2 ? 2580 : undefined
+        });
+    });
+         
+
     names258.forEach((name, idx) => {
         const bonus = Math.floor(Math.random() * 81); // +0~80 风华
         items.push({
@@ -295,10 +312,9 @@ function buildShopItems() {
             score: 500 + bonus,
             tier: 2580,
             category: "cloth",
-            isSale: idx < 2,
-            originalPrice: idx < 2 ? 3280 : undefined
         });
-    });
+    });       
+
     names128.forEach((name, idx) => {
         const bonus = Math.floor(Math.random() * 81);
         items.push({ id: `set-128-${idx}`, name, price: 1280, score: 300 + bonus, tier: 1280, category: "cloth" });
